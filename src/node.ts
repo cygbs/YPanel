@@ -164,17 +164,27 @@ app.post('/api/instances/:id/start', (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
   if (managedProcesses.has(id)) {
+    console.log(`[node] already_running: #${id}`);
     res.json({ status: 'already_running', instanceId: id });
     return;
   }
   const inst = getInstanceById(id);
   if (!inst) { res.status(404).json({ error: 'not found' }); return; }
 
-  const pty = spawn(getDefaultShell(), [], {
-    name: 'xterm-color', cols: 80, rows: 24,
-    cwd: inst.folder || os.homedir(),
-    env: { ...process.env } as { [key: string]: string },
-  });
+  console.log(`[node] starting instance #${id}: ${inst.name} in ${inst.folder}`);
+
+  let pty: IPty;
+  try {
+    pty = spawn(getDefaultShell(), [], {
+      name: 'xterm-color', cols: 80, rows: 24,
+      cwd: inst.folder || os.homedir(),
+      env: { ...process.env } as { [key: string]: string },
+    });
+  } catch (e: any) {
+    console.error(`[node] spawn failed for #${id}:`, e.message);
+    res.status(500).json({ error: `spawn failed: ${e.message}` });
+    return;
+  }
 
   const entry: ManagedProcess = {
     pty, outputBuffer: [], ws: null,
@@ -189,11 +199,13 @@ app.post('/api/instances/:id/start', (req, res) => {
     }
   });
 
-  pty.onExit(() => {
+  pty.onExit((exitCode) => {
+    console.log(`[node] process #${id} exited with code ${exitCode?.exitCode ?? '?'}`);
     managedProcesses.delete(id);
   });
 
   managedProcesses.set(id, entry);
+  console.log(`[node] process #${id} added to map, total: ${managedProcesses.size}`);
 
   pty.write(`cd "${inst.folder}"\n`);
   pty.write(`${inst.command}\n`);
@@ -249,21 +261,77 @@ wss.on('connection', (ws: WebSocket, req) => {
   const instanceIdStr = parsed.searchParams.get('instanceId');
   const instanceId = instanceIdStr ? parseInt(instanceIdStr, 10) : null;
 
+  console.log(`[node] WS: instanceId=${instanceId} mapSize=${managedProcesses.size} keys=[${Array.from(managedProcesses.keys()).join(',')}]`);
+
   if (instanceId !== null && !isNaN(instanceId)) {
     // ── 连接到已存在的实例进程 ──
     const mp = managedProcesses.get(instanceId);
-    if (!mp) {
-      ws.send('Instance process not running.\r\n');
+    if (mp) {
+      // 进程存在，直接连接
+      console.log(`[node] WS: process #${instanceId} FOUND, connecting`);
+      mp.ws = ws;
+
+      // 发送缓冲区中的最近输出（最多 200 条）
+      const buf = mp.outputBuffer.slice(-200);
+      for (const data of buf) {
+        if (ws.readyState === WebSocket.OPEN) ws.send(data);
+      }
+
+      ws.on('message', (raw: Buffer | ArrayBuffer | Buffer[]) => {
+        const msg = raw.toString();
+        try {
+          const json = JSON.parse(msg);
+          if (json.type === 'resize') {
+            mp.resizeCols = json.cols;
+            mp.resizeRows = json.rows;
+            mp.pty.resize(json.cols, json.rows);
+            return;
+          }
+        } catch { /* not JSON */ }
+        mp.pty.write(msg);
+      });
+
+      ws.on('close', () => { mp.ws = null; });
+      ws.on('error', () => { mp.ws = null; });
+      return;
+    }
+
+    // ── 进程不存在：自动在实例文件夹中创建新 Shell ──
+    console.log(`[node] WS: process #${instanceId} NOT found, auto-spawning shell in instance folder`);
+    const inst = getInstanceById(instanceId);
+    const cwd = inst?.folder || os.homedir();
+
+    let shell: IPty;
+    try {
+      shell = spawn(getDefaultShell(), [], {
+        name: 'xterm-color', cols: 80, rows: 24,
+        cwd,
+        env: { ...process.env } as { [key: string]: string },
+      });
+    } catch (e: any) {
+      ws.send(`Failed to spawn shell: ${e.message}\r\n`);
       ws.close();
       return;
     }
 
-    mp.ws = ws;
-
-    // 发送缓冲区中的最近输出（最多 200 条）
-    const buf = mp.outputBuffer.slice(-200);
-    for (const data of buf) {
+    // 作为新的受控进程注册
+    const entry: ManagedProcess = { pty: shell, outputBuffer: [], ws, resizeCols: 80, resizeRows: 24 };
+    shell.onData((data: string) => {
+      entry.outputBuffer.push(data);
+      if (entry.outputBuffer.length > 2000) entry.outputBuffer.shift();
       if (ws.readyState === WebSocket.OPEN) ws.send(data);
+    });
+    shell.onExit(() => { managedProcesses.delete(instanceId); });
+    managedProcesses.set(instanceId, entry);
+
+    console.log(`[node] WS: auto-spawned shell for #${instanceId} in ${cwd}`);
+
+    // 先 cd 到实例目录，再执行启动命令（如果有）
+    if (inst?.folder) {
+      shell.write(`cd "${inst.folder}"\n`);
+    }
+    if (inst?.command) {
+      shell.write(`${inst.command}\n`);
     }
 
     ws.on('message', (raw: Buffer | ArrayBuffer | Buffer[]) => {
@@ -271,17 +339,17 @@ wss.on('connection', (ws: WebSocket, req) => {
       try {
         const json = JSON.parse(msg);
         if (json.type === 'resize') {
-          mp.resizeCols = json.cols;
-          mp.resizeRows = json.rows;
-          mp.pty.resize(json.cols, json.rows);
+          entry.resizeCols = json.cols;
+          entry.resizeRows = json.rows;
+          shell.resize(json.cols, json.rows);
           return;
         }
       } catch { /* not JSON */ }
-      mp.pty.write(msg);
+      shell.write(msg);
     });
 
-    ws.on('close', () => { mp.ws = null; });
-    ws.on('error', () => { mp.ws = null; });
+    ws.on('close', () => { shell.kill(); });
+    ws.on('error', () => { shell.kill(); });
   } else {
     // ── 普通终端（每次新建 shell） ──
     const shell: IPty = spawn(getDefaultShell(), [], {
