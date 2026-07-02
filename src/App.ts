@@ -658,7 +658,7 @@ export default defineComponent({
               <div v-if="showGeneratedToken" class="node-token-box">
                 <div class="node-token-label">在目标机器上运行以下命令：</div>
                 <div class="node-token-cmd">
-                  tsx src/node.ts -s ws://{{ locationHost }}/link -t {{ generatedToken }} -p 6701
+                  node index.js -s ws://{{ locationHost }}/link -t {{ generatedToken }} -p 6701
                 </div>
                 <div class="node-token-note">节点名称：{{ generatedNodeName }}</div>
                 <div class="node-token-note">节点会保存到数据中，等待连接中…</div>
