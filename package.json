@@ -5,9 +5,11 @@
   "private": true,
   "scripts": {
     "build:client": "esbuild src/client.ts --bundle --outfile=public/client.js --alias:vue=./node_modules/vue/dist/vue.esm-browser.js",
-    "build:server": "esbuild src/server.ts --bundle --platform=node --outfile=dist/index.js --external:node-pty",
-    "build": "npm run build:client && npm run build:server && node scripts/copy-dist.js",
-    "start": "npm run build:client && tsx src/server.ts"
+    "build:hub": "esbuild src/hub.ts --bundle --platform=node --outfile=dist/index.js",
+    "build:node": "esbuild src/node.ts --bundle --platform=node --outfile=dist-node/index.js --external:node-pty",
+    "build": "npm run build:client && npm run build:hub && npm run build:node && node scripts/copy-dist.js",
+    "start": "npm run build:client && tsx src/hub.ts",
+    "start:node": "tsx src/node.ts"
   },
   "dependencies": {
     "express": "^4.18.2",

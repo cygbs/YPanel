@@ -9,6 +9,7 @@ export default defineComponent({
     isActive: { type: Boolean, default: false },
     initCommands: { type: Array as PropType<string[]>, default: () => [] },
     instanceId: { type: Number, default: null },
+    nodeId: { type: Number, default: null },
   },
   setup(props, { expose }) {
     const terminalRef = ref<HTMLElement | null>(null);
@@ -80,9 +81,24 @@ export default defineComponent({
 
       // ── WebSocket ──
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = props.instanceId !== null
-        ? `${protocol}//${location.host}/ws?instanceId=${props.instanceId}`
-        : `${protocol}//${location.host}`;
+
+      // 构建 WS URL：通过 Hub 代理到节点的终端
+      const params = new URLSearchParams();
+      if (props.instanceId !== null && props.instanceId !== undefined) {
+        params.set('instanceId', String(props.instanceId));
+      }
+      if (props.nodeId !== null && props.nodeId !== undefined) {
+        params.set('nodeId', String(props.nodeId));
+      }
+
+      const wsPath = params.toString() ? `/ws?${params.toString()}` : '';
+      const wsUrl = wsPath ? `${protocol}//${location.host}${wsPath}` : null;
+
+      if (!wsUrl) {
+        terminal.write('Terminal unavailable (no node specified).\r\n');
+        return;
+      }
+
       ws = new WebSocket(wsUrl);
 
       // IME
@@ -150,7 +166,6 @@ export default defineComponent({
     });
 
     function onResize(): void {
-      // 只对可见的终端执行 fit
       if (props.isActive) {
         fitAddon?.fit();
       }

@@ -284,6 +284,183 @@
       box-shadow: 0 0 0 1px #6272a4;
     }
 
+    /* ── 节点管理 ── */
+    .node-breadcrumb {
+      height: 30px;
+      flex-shrink: 0;
+      background: #12122a;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 6px;
+      font-size: 12px;
+      color: #888;
+    }
+    .node-breadcrumb a {
+      color: #50fa7b;
+      text-decoration: none;
+    }
+    .node-breadcrumb a:hover {
+      text-decoration: underline;
+    }
+    .bc-sep {
+      color: #555;
+    }
+    .bc-current {
+      color: #ccc;
+    }
+    .home-body-empty {
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    .no-node-hint {
+      text-align: center;
+      color: #888;
+    }
+    .no-node-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+    .no-node-hint p {
+      font-size: 14px;
+      margin: 4px 0;
+    }
+    .no-node-sub {
+      color: #666;
+      font-size: 12px !important;
+    }
+    .no-instances-hint {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      font-size: 13px;
+      padding: 40px 0;
+    }
+
+    /* ── 节点列表对话框 ── */
+    .dialog-lg {
+      width: 600px;
+    }
+    .node-gen-section {
+      background: #161633;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .node-gen-row {
+      display: flex;
+      gap: 8px;
+    }
+    .node-gen-row .input {
+      flex: 1;
+    }
+    .node-token-box {
+      margin-top: 10px;
+      background: #0f0f1e;
+      border: 1px solid #2a2a4a;
+      border-radius: 6px;
+      padding: 12px;
+    }
+    .node-token-label {
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 6px;
+    }
+    .node-token-cmd {
+      font-family: Menlo, Monaco, 'Courier New', monospace;
+      font-size: 12px;
+      background: #12122a;
+      padding: 10px 12px;
+      border-radius: 5px;
+      color: #50fa7b;
+      line-height: 1.5;
+      word-break: break-all;
+      user-select: all;
+    }
+    .node-token-note {
+      font-size: 11px;
+      color: #777;
+      margin-top: 6px;
+    }
+    .node-list-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #aaa;
+      margin-top: 4px;
+    }
+    .node-empty {
+      text-align: center;
+      color: #666;
+      padding: 20px 0;
+      font-size: 13px;
+    }
+    .node-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: #161633;
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .node-item.connected {
+      border: 1px solid #2a4a3a;
+    }
+    .node-item.pending {
+      opacity: 0.6;
+    }
+    .node-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .node-status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .node-status-dot.online {
+      background: #50fa7b;
+      box-shadow: 0 0 6px rgba(80, 250, 123, 0.4);
+    }
+    .node-status-dot.offline {
+      background: #555;
+    }
+    .node-status-dot.pending-dot {
+      background: #f1fa8c;
+    }
+    .node-details {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .node-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e0e0e0;
+    }
+    .node-addr {
+      font-size: 11px;
+      color: #777;
+      font-family: monospace;
+    }
+    .node-seen {
+      font-size: 11px;
+      color: #888;
+    }
+    .node-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .btn-sm {
+      height: 28px !important;
+      padding: 0 12px !important;
+      font-size: 12px !important;
+    }
+
     /* ── 终端 ── */
     .terminal-wrapper {
       position: absolute;
