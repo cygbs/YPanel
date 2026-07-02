@@ -41,25 +41,41 @@
       display: flex;
       align-items: center;
       background: #0f0f1e;
-      height: 36px;
-      padding: 0 4px;
-      gap: 2px;
-      user-select: none;
+      height: 42px;
       flex-shrink: 0;
+      display: flex;
+      align-items: stretch;
+      user-select: none;
+    }
+    .tabs-scroll {
+      flex: 1;
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0 2px;
+    }
+    .tabs-scroll::-webkit-scrollbar {
+      height: 4px;
+    }
+    .tabs-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .tabs-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
     }
     .tab {
       display: flex;
       align-items: center;
-      height: 28px;
-      padding: 0 10px;
+      flex: 0 1 180px;
+      min-width: 80px;
+      width: 180px;
+      padding: 0 6px 0 12px;
       background: #1a1a2e;
-      border-radius: 6px 6px 0 0;
       cursor: pointer;
       color: #888;
-      font-size: 12px;
-      min-width: 0;
+      font-size: 13px;
       transition: background 0.15s, color 0.15s;
-      position: relative;
     }
     .tab:hover {
       background: #22223a;
@@ -77,14 +93,14 @@
       max-width: 120px;
     }
     .tab-close {
-      margin-left: 6px;
-      width: 16px;
-      height: 16px;
+      margin-left: auto;
+      width: 24px;
+      height: 24px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 3px;
-      font-size: 14px;
+      border-radius: 4px;
+      font-size: 18px;
       line-height: 1;
       color: #666;
       flex-shrink: 0;
@@ -97,16 +113,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
+      width: 36px;
+      flex-shrink: 0;
       cursor: pointer;
       color: #666;
-      font-size: 18px;
+      font-size: 22px;
       line-height: 1;
       transition: background 0.15s, color 0.15s;
-      flex-shrink: 0;
-      margin-left: 2px;
     }
     .tab-add:hover {
       background: #22223a;
@@ -117,7 +130,49 @@
     .page-home {
       width: 100%;
       height: 100%;
-      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+    }
+    .quick-actions {
+      height: 40px;
+      flex-shrink: 0;
+      background: #16162e;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+    }
+    .quick-actions button {
+      height: 28px;
+      padding: 0 14px;
+      background: #22224a;
+      border: none;
+      border-radius: 5px;
+      color: #ccc;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+    .quick-actions button:hover {
+      background: #2e2e5a;
+      color: #fff;
+    }
+    .home-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+    .instance-list {
+      flex: 1;
+      background: #12122a;
+      overflow-y: auto;
+    }
+    .function-menu {
+      width: 230px;
+      flex-shrink: 0;
+      background: #1a1a32;
+      overflow-y: auto;
     }
 
     /* ── 终端 ── */

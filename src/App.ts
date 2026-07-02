@@ -55,21 +55,23 @@ export default defineComponent({
     <div class="app-layout">
       <!-- 标签栏 -->
       <div class="tab-bar">
-        <div
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="tab"
-          :class="{ active: tab.id === activeId }"
-          @click="switchTab(tab.id)"
-          @mousedown.middle="closeTab(tab.id)"
-        >
-          <span class="tab-label">{{ tab.title }}</span>
-          <span
-            v-if="tab.type === 'terminal'"
-            class="tab-close"
-            @click.stop="closeTab(tab.id)"
-            title="关闭"
-          >&times;</span>
+        <div class="tabs-scroll">
+          <div
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="tab"
+            :class="{ active: tab.id === activeId }"
+            @click="switchTab(tab.id)"
+            @mousedown.middle="closeTab(tab.id)"
+          >
+            <span class="tab-label">{{ tab.title }}</span>
+            <span
+              v-if="tab.type === 'terminal'"
+              class="tab-close"
+              @click.stop="closeTab(tab.id)"
+              title="关闭"
+            >&times;</span>
+          </div>
         </div>
         <div class="tab-add" @click="addTerminalTab" title="新标签页">+</div>
       </div>
@@ -77,7 +79,22 @@ export default defineComponent({
       <!-- 内容区 -->
       <div class="content-area">
         <!-- 主页 -->
-        <div v-show="activeId === 0" class="page-home"></div>
+        <div v-show="activeId === 0" class="page-home">
+          <div class="quick-actions">
+            <button>新建实例</button>
+            <button>打开文件夹…</button>
+            <button>设置</button>
+            <button>帮助</button>
+          </div>
+          <div class="home-body">
+            <div class="instance-list">
+              <!-- 实例列表（暂无内容） -->
+            </div>
+            <div class="function-menu">
+              <!-- 功能菜单（暂无内容） -->
+            </div>
+          </div>
+        </div>
 
         <!-- 终端标签页 -->
         <div
