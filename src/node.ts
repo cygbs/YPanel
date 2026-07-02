@@ -37,10 +37,11 @@ if (!HUB_URL || !TOKEN) {
 }
 
 // ── 路径解析 ──
-// 查找 data/ 目录：优先用 __dirname 下的（构建产物），否则取父级（开发模式）
-const ROOT_DIR = fs.existsSync(path.join(__dirname, 'data'))
-  ? __dirname
-  : path.resolve(__dirname, '..');
+// tsx 开发模式脚本为 .ts, 构建产物为 .js
+// .ts → 取父级（项目根目录），.js → 取脚本所在目录
+const ROOT_DIR = process.argv[1]?.endsWith('.ts')
+  ? path.resolve(__dirname, '..')
+  : __dirname;
 
 // ── 数据存储（节点本地） ──
 const DATA_DIR = path.join(ROOT_DIR, 'data');

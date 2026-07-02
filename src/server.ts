@@ -14,8 +14,11 @@ const wss = new WebSocketServer({ server, clientTracking: false });
 app.use(express.json());
 
 // ── 路径解析（兼容 tsx 开发模式与 dist 构建模式） ──
-const IS_DIST = __dirname.endsWith('dist') || __dirname.endsWith('dist/');
-const ROOT_DIR = IS_DIST ? __dirname : path.resolve(__dirname, '..');
+// tsx 开发模式脚本为 .ts, 构建产物为 .js
+// .ts → 取父级（项目根目录），.js → 取脚本所在目录
+const ROOT_DIR = process.argv[1]?.endsWith('.ts')
+  ? path.resolve(__dirname, '..')
+  : __dirname;
 
 app.use(express.static(path.join(ROOT_DIR, 'public')));
 
