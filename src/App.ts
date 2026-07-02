@@ -126,6 +126,15 @@ export default defineComponent({
       } catch { /* ignore */ }
     }
 
+    /** 选中的节点（在节点列表中高亮） */
+    const selectedNodeId = ref<number | null>(null);
+    const selectedNodeForMenu = computed(() =>
+      nodes.value.find(n => n.id === selectedNodeId.value) ?? null
+    );
+    function selectNode(id: number | null): void {
+      selectedNodeId.value = id;
+    }
+
     /** 打开节点列表对话框 */
     function openNodeDialog(): void {
       showNodeDialog.value = true;
@@ -521,6 +530,7 @@ export default defineComponent({
       showNodeDialog, newNodeName, generatingNode,
       generatedToken, generatedNodeName, showGeneratedToken, locationHost,
       nodeError,
+      selectedNodeId, selectedNodeForMenu, selectNode,
       openNodeDialog, closeNodeDialog, generateNodeToken,
       deleteNode, cancelPendingToken,
       switchToNode, leaveNode,
@@ -572,28 +582,54 @@ export default defineComponent({
               <button @click="openNewInstance">新建实例</button>
               <button>打开文件夹…</button>
               <button @click="openSettings">设置</button>
+              <button @click="leaveNode" class="qa-back">返回节点列表</button>
             </template>
-            <button @click="openNodeDialog">节点列表</button>
+            <template v-else>
+              <button @click="openNodeDialog">新增节点…</button>
+            </template>
             <button>帮助</button>
           </div>
 
-          <!-- 节点路径 -->
-          <div v-if="activeNode" class="node-breadcrumb">
-            <a href="#" @click.prevent="leaveNode">节点列表</a>
-            <span class="bc-sep">/</span>
-            <span class="bc-current">{{ activeNode.name }}</span>
-          </div>
-
           <!-- 主体区域 -->
-          <div class="home-body" :class="{ 'home-body-empty': activeNodeId === null }">
-            <!-- 未选择节点 -->
-            <div v-if="activeNodeId === null" class="no-node-hint">
-              <div class="no-node-icon">📡</div>
-              <p>请选择一个节点来管理其上的实例</p>
-              <p class="no-node-sub">点击上方「节点列表」按钮查看可用节点</p>
-            </div>
+          <div class="home-body">
+            <!-- 节点列表模式 -->
+            <template v-if="activeNodeId === null">
+              <div class="instance-list">
+                <div
+                  v-for="node in nodes"
+                  :key="node.id"
+                  class="instance-card"
+                  :class="{ selected: node.id === selectedNodeId }"
+                  @click="selectNode(node.id)"
+                >
+                  <div class="inst-icon-wrap">
+                    <img class="inst-icon" src="/assets/instances/gear.svg" alt="node" />
+                    <span class="status-dot" :class="node.connected ? 'running' : ''"></span>
+                  </div>
+                  <span class="inst-name">{{ node.name }}</span>
+                </div>
+                <div v-if="nodes.length === 0" class="no-instances-hint">
+                  暂无节点，点击「新增节点…」创建
+                </div>
+              </div>
+              <div class="function-menu">
+                <template v-if="selectedNodeForMenu">
+                  <div class="fm-icon" @click="selectNode(null)">
+                    <img src="/assets/instances/gear.svg" />
+                  </div>
+                  <div class="fm-name">{{ selectedNodeForMenu.name }}</div>
+                  <div class="fm-actions">
+                    <button class="fm-btn" :disabled="!selectedNodeForMenu.connected"
+                      @click="switchToNode(selectedNodeForMenu.id)">切换</button>
+                    <button class="fm-btn fm-btn-danger"
+                      @click="deleteNode(selectedNodeForMenu.id)">删除</button>
+                  </div>
+                </template>
+                <div v-else class="fm-empty">选择一个节点</div>
+              </div>
+            </template>
 
-            <!-- 已选择节点：显示实例 -->
+            <!-- 实例模式 -->
             <template v-else>
               <div class="instance-list">
                 <div
@@ -651,12 +687,11 @@ export default defineComponent({
         </div>
       </div>
 
-      <!-- ===== 节点列表对话框 ===== -->
+      <!-- ===== 新增节点对话框（生成 Token） ===== -->
       <div v-if="showNodeDialog" class="dialog-overlay" @click.self="closeNodeDialog">
-        <div class="dialog dialog-lg">
-          <div class="dialog-title">节点列表</div>
+        <div class="dialog">
+          <div class="dialog-title">新增节点</div>
           <div class="dialog-body">
-            <!-- 生成 Token -->
             <div class="node-gen-section">
               <div class="node-gen-row">
                 <input
@@ -666,7 +701,7 @@ export default defineComponent({
                   placeholder="节点名称（可选）"
                 />
                 <button class="btn btn-primary" :disabled="generatingNode" @click="generateNodeToken">
-                  {{ generatingNode ? '生成中…' : '新增节点…' }}
+                  {{ generatingNode ? '生成中…' : '生成 Token' }}
                 </button>
               </div>
               <div v-if="nodeError" class="field-error">{{ nodeError }}</div>
@@ -679,35 +714,8 @@ export default defineComponent({
                 <div class="node-token-note">节点会保存到数据中，等待连接中…</div>
               </div>
             </div>
-
-            <!-- 节点列表 -->
-            <div class="node-list-title">已注册节点</div>
-            <div v-if="nodes.length === 0 && pendingTokens.length === 0" class="node-empty">
-              暂无节点，请先点击「新增节点…」
-            </div>
-            <div v-for="node in nodes" :key="node.id" class="node-item" :class="{ connected: node.connected }">
-              <div class="node-info">
-                <div class="node-status-dot" :class="{ online: node.connected, offline: !node.connected }"></div>
-                <div class="node-details">
-                  <span class="node-name">{{ node.name }}</span>
-                  <span class="node-addr">{{ node.address }}:{{ node.port }}</span>
-                  <span class="node-seen">{{ node.connected ? '在线' : '离线' }}</span>
-                </div>
-              </div>
-              <div class="node-actions">
-                <button
-                  class="btn btn-primary btn-sm"
-                  :disabled="!node.connected"
-                  @click="switchToNode(node.id)"
-                >
-                  {{ node.connected ? '切换' : '离线' }}
-                </button>
-                <button class="btn btn-danger btn-sm" @click="deleteNode(node.id)">删除</button>
-              </div>
-            </div>
-
             <!-- 待处理的 Token -->
-            <div v-if="pendingTokens.length > 0" class="node-list-title">等待连接</div>
+            <div v-if="pendingTokens.length > 0" class="node-list-title">等待连接的 Token</div>
             <div v-for="pt in pendingTokens" :key="pt.token" class="node-item pending">
               <div class="node-info">
                 <div class="node-status-dot pending-dot"></div>
