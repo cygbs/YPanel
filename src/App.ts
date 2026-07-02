@@ -22,7 +22,11 @@ const AVAILABLE_ICONS = [
 ];
 
 function generateUUID(): string {
-  return crypto.randomUUID();
+  // Math.random 模拟 UUID v4，各浏览器/HTTP 都兼容
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
 }
 
 let nextTabId = 1;
