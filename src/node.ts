@@ -31,8 +31,8 @@ const TOKEN = args.t || args.T || '';
 const NODE_PORT = parseInt(args.p || args.P || '6701', 10);
 
 if (!HUB_URL || !TOKEN) {
-  console.error('Usage: tsx src/node.ts -s <hub-ws-url> -t <token> [-p <port>]');
-  console.error('Example: tsx src/node.ts -s ws://localhost:6699/link -t <token>');
+  console.error('Usage: node index.js -s <hub-ws-url> -t <token> [-p <port>]');
+  console.error('Example: node index.js -s ws://192.168.1.100:6699/link -t <token>');
   process.exit(1);
 }
 
@@ -317,11 +317,12 @@ function connectToHub(): void {
   const ws = new WebSocket(HUB_URL);
 
   ws.on('open', () => {
-    const localAddress = process.env.NODE_ADDRESS || '127.0.0.1';
+    // 自动检测本机 IP：取连接 Hub 时使用的网卡地址
+    const localAddr = (ws as any)._socket?.localAddress || '127.0.0.1';
     ws.send(JSON.stringify({
       type: 'register',
       token: TOKEN,
-      address: localAddress,
+      address: localAddr,
       port: NODE_PORT,
     }));
   });
