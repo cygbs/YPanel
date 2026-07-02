@@ -312,17 +312,35 @@ wss.on('connection', (ws: WebSocket, req) => {
 // Hub 连接
 // ═══════════════════════════════════════════════════
 
+/** 获取本机非回环 IPv4 地址（供 Hub 回连使用） */
+function getNodeAddress(socket: WebSocket): string {
+  // 1. 优先从连接 Hub 的 socket 获取
+  const sockAddr = (socket as any)._socket?.localAddress;
+  if (sockAddr && sockAddr !== '::1' && sockAddr !== '127.0.0.1' && sockAddr !== '127.0.1.1') {
+    return sockAddr;
+  }
+  // 2. 扫描网卡，取第一个非回环 IPv4 地址
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const iface of ifaces[name] || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  // 3. 实在找不到，回退
+  return '127.0.0.1';
+}
+
 function connectToHub(): void {
   console.log(`Connecting to hub: ${HUB_URL}`);
   const ws = new WebSocket(HUB_URL);
 
   ws.on('open', () => {
-    // 自动检测本机 IP：取连接 Hub 时使用的网卡地址
-    const localAddr = (ws as any)._socket?.localAddress || '127.0.0.1';
     ws.send(JSON.stringify({
       type: 'register',
       token: TOKEN,
-      address: localAddr,
+      address: getNodeAddress(ws),
       port: NODE_PORT,
     }));
   });
