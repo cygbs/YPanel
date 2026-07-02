@@ -15,6 +15,8 @@ A web panel for Minecraft server.
 
 `Hub`的作用是提供面板，`Node`的作用是实际管理实例。运行`Node`的服务器可以位于NAT后而不影响控制。只需要`Hub`暴露一个端口即可。你需要手动连接`Hub`与`Node`这两个部分。
 
+如果你使用的系统不是GNU/Linux，你可能需要重新编译这个项目，目前Releases中的版本可能无法运行。
+
 ## todo
 
 - 实现登录系统。
