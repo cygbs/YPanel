@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YPanel</title>
+  <link rel="stylesheet" href="client.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1a2e;
+    }
+    #terminal {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 覆盖默认黑底，使用主题色 */
+    .xterm .xterm-viewport {
+      background-color: #1a1a2e;
+    }
+
+    /* 保持 textarea 在布局中供 IME 使用 */
+    .xterm .xterm-helper-textarea {
+      width: 1px !important;
+      height: 1px !important;
+    }
+
+    /* 滚动条样式 */
+    .xterm-viewport::-webkit-scrollbar {
+      width: 6px;
+    }
+    .xterm-viewport::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .xterm-viewport::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+    .xterm-viewport::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+  </style>
+</head>
+<body>
+  <div id="terminal"></div>
+  <script src="client.js"></script>
+</body>
+</html>
