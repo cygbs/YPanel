@@ -335,9 +335,20 @@ export default defineComponent({
       const inst = selectedInstance.value;
       if (!inst || activeNodeId.value === null) return;
       const prefix = apiPrefix();
-      await fetch(prefix + '/instances/' + inst.id + '/start', { method: 'POST' });
-      runningStates[inst.id] = 'running';
-      openTerminalForInstance(inst);
+      try {
+        const res = await fetch(prefix + '/instances/' + inst.id + '/start', { method: 'POST' });
+        if (!res.ok) {
+          console.error('start failed:', res.status, await res.text());
+          return;
+        }
+        const data = await res.json();
+        if (data.status === 'started' || data.status === 'already_running') {
+          runningStates[inst.id] = 'running';
+          openTerminalForInstance(inst);
+        }
+      } catch (e) {
+        console.error('start error:', e);
+      }
     }
 
     function openTerminalForInstance(inst: any): void {
