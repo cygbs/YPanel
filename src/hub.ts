@@ -21,8 +21,10 @@ const wss = new WebSocketServer({ server, clientTracking: false });
 app.use(express.json());
 
 // ── 路径解析（兼容 tsx 开发模式与 dist 构建模式） ──
-const IS_DIST = __dirname.endsWith('dist') || __dirname.endsWith('dist/');
-const ROOT_DIR = IS_DIST ? __dirname : path.resolve(__dirname, '..');
+// 查找 data/ 目录：优先用 __dirname 下的（构建产物），否则取父级（开发模式）
+const ROOT_DIR = fs.existsSync(path.join(__dirname, 'data'))
+  ? __dirname
+  : path.resolve(__dirname, '..');
 app.use(express.static(path.join(ROOT_DIR, 'public')));
 
 // ── 数据存储 ──

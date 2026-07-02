@@ -37,8 +37,10 @@ if (!HUB_URL || !TOKEN) {
 }
 
 // ── 路径解析 ──
-const IS_DIST = __dirname.endsWith('dist') || __dirname.endsWith('dist/');
-const ROOT_DIR = IS_DIST ? __dirname : path.resolve(__dirname, '..');
+// 查找 data/ 目录：优先用 __dirname 下的（构建产物），否则取父级（开发模式）
+const ROOT_DIR = fs.existsSync(path.join(__dirname, 'data'))
+  ? __dirname
+  : path.resolve(__dirname, '..');
 
 // ── 数据存储（节点本地） ──
 const DATA_DIR = path.join(ROOT_DIR, 'data');
