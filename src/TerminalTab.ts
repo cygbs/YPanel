@@ -7,8 +7,9 @@ export default defineComponent({
   props: {
     tabId: { type: Number, required: true },
     isActive: { type: Boolean, default: false },
+    initCommands: { type: Array as PropType<string[]>, default: () => [] },
   },
-  setup(props) {
+  setup(props, { expose }) {
     const terminalRef = ref<HTMLElement | null>(null);
     let terminal: Terminal | null = null;
     let fitAddon: FitAddon | null = null;
@@ -95,6 +96,15 @@ export default defineComponent({
           cols: terminal?.cols,
           rows: terminal?.rows,
         }));
+        // 执行初始化命令
+        const cmds = props.initCommands;
+        if (cmds && cmds.length > 0) {
+          setTimeout(() => {
+            for (const cmd of cmds) {
+              ws?.send(cmd + '\n');
+            }
+          }, 200);
+        }
       });
 
       ws.addEventListener('message', (event: MessageEvent<string>) => {
@@ -122,6 +132,15 @@ export default defineComponent({
       });
 
       window.addEventListener('resize', onResize);
+    });
+
+    // 暴露方法供父组件调用
+    expose({
+      sendText(text: string) {
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(text);
+        }
+      },
     });
 
     function onResize(): void {

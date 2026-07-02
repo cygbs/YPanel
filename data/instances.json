@@ -1,0 +1,15 @@
+{
+  "instances": [
+    {
+      "id": 0,
+      "name": "原版服务端",
+      "uuid": "354f849b-753a-499b-9687-9497783d7f98",
+      "icon": "grass.svg",
+      "command": "java -jar server.jar",
+      "folder": "/home/ygbs/Downloads/Test/",
+      "stopCommand": "^C",
+      "autoStart": false,
+      "createdAt": "2026-07-02T05:18:29.575Z"
+    }
+  ]
+}
