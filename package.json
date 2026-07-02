@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "build:client": "esbuild src/client.ts --bundle --outfile=public/client.js --alias:vue=./node_modules/vue/dist/vue.esm-browser.js",
+    "build:server": "esbuild src/server.ts --bundle --platform=node --outfile=dist/index.js --external:node-pty",
+    "build": "npm run build:client && npm run build:server && node scripts/copy-dist.js",
     "start": "npm run build:client && tsx src/server.ts"
   },
   "dependencies": {

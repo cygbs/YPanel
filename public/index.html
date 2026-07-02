@@ -184,9 +184,28 @@
       background: #161633;
       border-radius: 8px;
     }
+    .inst-icon-wrap {
+      position: relative;
+      display: inline-flex;
+    }
     .inst-icon {
       width: 48px;
       height: 48px;
+    }
+    .status-dot {
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid #161633;
+    }
+    .status-dot.running {
+      background: #50fa7b;
+    }
+    .status-dot.stopping {
+      background: #ff5555;
     }
     .inst-name {
       font-size: 12px;
@@ -340,6 +359,15 @@
     .field-error {
       font-size: 11px;
       color: #ff5555;
+    }
+    .field-hint {
+      font-size: 11px;
+      color: #888;
+      font-weight: normal;
+    }
+    .input:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
     .field-row {
       flex-direction: row !important;

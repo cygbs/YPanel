@@ -1,4 +1,4 @@
-import { defineComponent, reactive, ref, computed } from 'vue';
+import { defineComponent, reactive, ref, computed, type ComputedRef } from 'vue';
 import TerminalTab from './TerminalTab';
 
 interface TabData {
@@ -6,6 +6,7 @@ interface TabData {
   title: string;
   type: 'home' | 'terminal';
   initCommands?: string[];
+  instanceId?: number | null;
 }
 
 const AVAILABLE_ICONS = [
@@ -47,8 +48,17 @@ export default defineComponent({
     const selectedInstance = computed(() =>
       instances.value.find((i) => i.id === selectedId.value) ?? null
     );
+    const runningStates = reactive<Record<number, 'running' | 'stopping' | false>>({});
     const showNewDialog = ref(false);
+    const isEditing = ref(false);
+    const editingId = ref<number | null>(null);
+    const isEditingLocked = computed(() =>
+      isEditing.value && editingId.value !== null && !!runningStates[editingId.value]
+    );
     const showIconPicker = ref(false);
+    const showSettings = ref(false);
+    const savingSettings = ref(false);
+    const settings = reactive({ defaultShell: '/usr/bin/bash' });
     const showDeleteConfirm = ref(false);
     const saving = ref(false);
     const tabRefs = ref<Record<number, any>>({});
@@ -78,13 +88,41 @@ export default defineComponent({
     }
 
     function openNewInstance(): void {
+      isEditing.value = false;
+      editingId.value = null;
       resetNewData();
       showNewDialog.value = true;
+    }
+
+    async function openEditInstance(): Promise<void> {
+      const inst = selectedInstance.value;
+      if (!inst) return;
+      isEditing.value = true;
+      editingId.value = inst.id;
+      newData.name = inst.name;
+      newData.uuid = inst.uuid;
+      newData.icon = inst.icon;
+      newData.command = inst.command;
+      newData.folder = inst.folder;
+      newData.stopCommand = inst.stopCommand;
+      newData.autoStart = !!inst.autoStart;
+      showIconPicker.value = false;
+      showNewDialog.value = true;
+      // 查询最新运行状态
+      try {
+        const res = await fetch('/api/instances/' + inst.id + '/status');
+        if (res.ok) {
+          const data = await res.json();
+          runningStates[inst.id] = data.running ? 'running' : false;
+        }
+      } catch { /* ignore */ }
     }
 
     function closeNewDialog(): void {
       showNewDialog.value = false;
       showIconPicker.value = false;
+      isEditing.value = false;
+      editingId.value = null;
     }
 
     function selectIcon(name: string): void {
@@ -105,27 +143,76 @@ export default defineComponent({
       activeId.value = id;
     }
 
-    function startInstance(): void {
-      const inst = selectedInstance.value;
-      if (!inst) return;
-      const cmds = [`cd ${inst.folder}`, inst.command];
-      addTerminalTab(`${inst.name} #${inst.id}`, cmds, inst.id);
+    function tabIdForInstance(instanceId: number): number | undefined {
+      // 检查是否已有标签页关联该实例（通过 instanceTabMap 且标签页仍存在）
+      const tid = instanceTabMap[instanceId];
+      if (tid !== undefined && tabs.some((t) => t.id === tid)) {
+        return tid;
+      }
+      return undefined;
     }
 
-    function stopInstance(): void {
+    async function pollStatus(): Promise<void> {
+      for (const inst of instances.value) {
+        try {
+          const res = await fetch('/api/instances/' + inst.id + '/status');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.running) {
+              if (runningStates[inst.id] === 'stopping') {
+                // 还在停止过程中，保持红色
+              } else {
+                runningStates[inst.id] = 'running';
+              }
+            } else {
+              runningStates[inst.id] = false;
+            }
+          }
+        } catch { /* ignore */ }
+      }
+    }
+
+    async function startInstance(): Promise<void> {
       const inst = selectedInstance.value;
       if (!inst) return;
-      const tabId = instanceTabMap[inst.id];
-      if (tabId === undefined) return;
-      const tabRef = tabRefs.value[tabId];
-      if (!tabRef?.sendText) return;
-      switchTab(tabId);
-      const stopCmd = inst.stopCommand || '^C';
-      if (stopCmd === '^C') {
-        tabRef.sendText('\x03');
-      } else {
-        tabRef.sendText(stopCmd + '\n');
+      await fetch('/api/instances/' + inst.id + '/start', { method: 'POST' });
+      runningStates[inst.id] = 'running';
+      openTerminalForInstance(inst);
+    }
+
+    function openTerminalForInstance(inst: any): void {
+      // 检查是否已有标签页
+      const existing = tabIdForInstance(inst.id);
+      if (existing !== undefined) {
+        switchTab(existing);
+        return;
       }
+      // 新建连接实例的终端标签页
+      const id = nextTabId++;
+      tabs.push({
+        id,
+        title: `${inst.name} #${inst.id}`,
+        type: 'terminal',
+        initCommands: [],
+        instanceId: inst.id,
+      });
+      instanceTabMap[inst.id] = id;
+      activeId.value = id;
+    }
+
+    function openTerminal(): void {
+      const inst = selectedInstance.value;
+      if (!inst) return;
+      openTerminalForInstance(inst);
+    }
+
+    async function stopInstance(): Promise<void> {
+      const inst = selectedInstance.value;
+      if (!inst) return;
+      runningStates[inst.id] = 'stopping';
+      await fetch('/api/instances/' + inst.id + '/stop', { method: 'POST' });
+      // 3 秒后刷新状态
+      setTimeout(() => pollStatus(), 3000);
     }
 
     function closeTab(id: number): void {
@@ -152,6 +239,12 @@ export default defineComponent({
         if (res.ok) {
           const data = await res.json();
           instances.value = data.instances;
+          // 初始化运行状态为 false
+          for (const inst of data.instances) {
+            if (!(inst.id in runningStates)) {
+              runningStates[inst.id] = false;
+            }
+          }
         }
       } catch {
         // ignore
@@ -179,31 +272,92 @@ export default defineComponent({
 
     async function createInstance(): Promise<void> {
       if (!validate()) return;
+      if (isEditingLocked.value) {
+        // 实例运行中：强制恢复为原始值，防止前端绕过 disabled 修改
+        const orig = selectedInstance.value;
+        if (orig) {
+          newData.command = orig.command;
+          newData.folder = orig.folder;
+        }
+        // 同时在服务端也禁止修改运行中实例的 command/folder
+        // 见 PUT 接口逻辑
+      }
       saving.value = true;
       try {
-        const res = await fetch('/api/instances', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: newData.name,
-            uuid: newData.uuid,
-            icon: newData.icon,
-            command: newData.command,
-            folder: newData.folder,
-            stopCommand: newData.stopCommand,
-            autoStart: newData.autoStart,
-          }),
-        });
-        if (res.ok) {
-          const created = await res.json();
-          instances.value.push(created);
-          closeNewDialog();
+        if (isEditing.value && editingId.value !== null) {
+          // 编辑已有实例
+          const res = await fetch('/api/instances/' + editingId.value, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: newData.name,
+              icon: newData.icon,
+              command: newData.command,
+              folder: newData.folder,
+              stopCommand: newData.stopCommand,
+              autoStart: newData.autoStart,
+            }),
+          });
+          if (res.ok) {
+            const updated = await res.json();
+            const idx = instances.value.findIndex((i) => i.id === editingId.value);
+            if (idx !== -1) instances.value[idx] = updated;
+            closeNewDialog();
+          }
+        } else {
+          // 新建实例
+          const res = await fetch('/api/instances', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: newData.name,
+              uuid: newData.uuid,
+              icon: newData.icon,
+              command: newData.command,
+              folder: newData.folder,
+              stopCommand: newData.stopCommand,
+              autoStart: newData.autoStart,
+            }),
+          });
+          if (res.ok) {
+            const created = await res.json();
+            instances.value.push(created);
+            closeNewDialog();
+          }
         }
       } catch (e) {
-        console.error('Failed to create instance', e);
+        console.error('Failed to save instance', e);
       } finally {
         saving.value = false;
       }
+    }
+
+    async function openSettings(): Promise<void> {
+      showSettings.value = true;
+      try {
+        const res = await fetch('/api/settings');
+        if (res.ok) {
+          const data = await res.json();
+          settings.defaultShell = data.defaultShell || '/usr/bin/bash';
+        }
+      } catch { /* ignore */ }
+    }
+
+    function closeSettings(): void {
+      showSettings.value = false;
+    }
+
+    async function saveSettings(): Promise<void> {
+      savingSettings.value = true;
+      try {
+        await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ defaultShell: settings.defaultShell }),
+        });
+        showSettings.value = false;
+      } catch { /* ignore */ }
+      finally { savingSettings.value = false; }
     }
 
     function openDeleteConfirm(): void {
@@ -232,6 +386,11 @@ export default defineComponent({
     // 初始加载
     loadInstances();
 
+    // 加载后检查实例运行状态
+    setTimeout(() => pollStatus(), 500);
+    // 每 10 秒轮询一次
+    const statusTimer = setInterval(() => pollStatus(), 10000);
+
     return {
       tabs,
       activeId,
@@ -240,18 +399,29 @@ export default defineComponent({
       closeTab,
       switchTab,
       showNewDialog,
+      isEditing,
+      isEditingLocked,
       showIconPicker,
+      showSettings,
       showDeleteConfirm,
       newData,
       saving,
+      savingSettings,
+      settings,
       errors,
       setTabRef,
+      runningStates,
       openNewInstance,
       closeNewDialog,
       selectIcon,
       createInstance,
       startInstance,
       stopInstance,
+      openTerminal,
+      openEditInstance,
+      openSettings,
+      closeSettings,
+      saveSettings,
       openDeleteConfirm,
       confirmDelete,
       cancelDelete,
@@ -293,13 +463,16 @@ export default defineComponent({
           <div class="quick-actions">
             <button @click="openNewInstance">新建实例</button>
             <button>打开文件夹…</button>
-            <button>设置</button>
+            <button @click="openSettings">设置</button>
             <button>帮助</button>
           </div>
           <div class="home-body">
             <div class="instance-list">
               <div v-for="inst in instances" :key="inst.id" class="instance-card" :class="{ selected: inst.id === selectedInstance?.id }" @click="selectInstance(inst.id)">
-                <img class="inst-icon" :src="'/assets/instances/' + inst.icon" :alt="inst.name" />
+                <div class="inst-icon-wrap">
+                  <img class="inst-icon" :src="'/assets/instances/' + inst.icon" :alt="inst.name" />
+                  <span v-if="runningStates[inst.id]" class="status-dot" :class="runningStates[inst.id]"></span>
+                </div>
                 <span class="inst-name">{{ inst.name }} #{{ inst.id }}</span>
               </div>
             </div>
@@ -312,7 +485,8 @@ export default defineComponent({
                 <div class="fm-actions">
                   <button class="fm-btn" @click="startInstance">启动</button>
                   <button class="fm-btn" @click="stopInstance">停止</button>
-                  <button class="fm-btn">打开终端</button>
+                  <button class="fm-btn" @click="openTerminal">打开终端</button>
+                  <button class="fm-btn" @click="openEditInstance">编辑</button>
                   <button class="fm-btn fm-btn-danger" @click="openDeleteConfirm">删除实例</button>
                 </div>
               </template>
@@ -328,14 +502,14 @@ export default defineComponent({
           :key="tab.id"
           class="terminal-wrapper"
         >
-          <TerminalTab :ref="(el) => setTabRef(tab.id, el)" :tab-id="tab.id" :is-active="tab.id === activeId" :init-commands="tab.initCommands || []" />
+          <TerminalTab :ref="(el) => setTabRef(tab.id, el)" :tab-id="tab.id" :is-active="tab.id === activeId" :init-commands="tab.initCommands || []" :instance-id="tab.instanceId ?? null" />
         </div>
       </div>
 
-      <!-- 新建实例对话框 -->
+      <!-- 新建/编辑实例对话框 -->
       <div v-if="showNewDialog" class="dialog-overlay" @click.self="closeNewDialog">
         <div class="dialog">
-          <div class="dialog-title">新建实例</div>
+          <div class="dialog-title">{{ isEditing ? '编辑实例' : '新建实例' }}</div>
           <div class="dialog-body">
             <!-- 实例名称 -->
             <label class="field">
@@ -387,12 +561,16 @@ export default defineComponent({
 
             <!-- 实例启动命令 -->
             <label class="field">
-              <span class="field-label">实例启动命令</span>
+              <span class="field-label">
+                实例启动命令
+                <span v-if="isEditing && editingId !== null && runningStates[editingId]" class="field-hint">（停止实例后方可修改）</span>
+              </span>
               <input
                 v-model="newData.command"
                 type="text"
                 class="input mono"
                 :class="{ invalid: errors.command }"
+                :disabled="isEditingLocked"
                 placeholder="java -jar xxx.jar"
               />
               <span v-if="errors.command" class="field-error">请填写这个。</span>
@@ -400,12 +578,16 @@ export default defineComponent({
 
             <!-- 实例文件夹 -->
             <label class="field">
-              <span class="field-label">实例文件夹</span>
+              <span class="field-label">
+                实例文件夹
+                <span v-if="isEditingLocked" class="field-hint">（停止实例后方可修改）</span>
+              </span>
               <input
                 v-model="newData.folder"
                 type="text"
                 class="input mono"
                 :class="{ invalid: errors.folder }"
+                :disabled="isEditingLocked"
                 placeholder="path/to/your/folder"
               />
               <span v-if="errors.folder" class="field-error">请填写这个。</span>
@@ -430,7 +612,29 @@ export default defineComponent({
           </div>
           <div class="dialog-actions">
             <button class="btn btn-secondary" @click="closeNewDialog">取消</button>
-            <button class="btn btn-primary" :disabled="saving" @click="createInstance">{{ saving ? '保存中…' : '创建' }}</button>
+            <button class="btn btn-primary" :disabled="saving" @click="createInstance">{{ saving ? '保存中…' : isEditing ? '保存' : '创建' }}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设置对话框 -->
+      <div v-if="showSettings" class="dialog-overlay" @click.self="closeSettings">
+        <div class="dialog">
+          <div class="dialog-title">设置</div>
+          <div class="dialog-body">
+            <label class="field">
+              <span class="field-label">默认Shell</span>
+              <input
+                v-model="settings.defaultShell"
+                type="text"
+                class="input mono"
+                placeholder="/usr/bin/bash"
+              />
+            </label>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-secondary" @click="closeSettings">取消</button>
+            <button class="btn btn-primary" :disabled="savingSettings" @click="saveSettings">{{ savingSettings ? '保存中…' : '保存' }}</button>
           </div>
         </div>
       </div>

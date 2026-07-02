@@ -8,6 +8,7 @@ export default defineComponent({
     tabId: { type: Number, required: true },
     isActive: { type: Boolean, default: false },
     initCommands: { type: Array as PropType<string[]>, default: () => [] },
+    instanceId: { type: Number, default: null },
   },
   setup(props, { expose }) {
     const terminalRef = ref<HTMLElement | null>(null);
@@ -79,7 +80,10 @@ export default defineComponent({
 
       // ── WebSocket ──
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${protocol}//${location.host}`);
+      const wsUrl = props.instanceId !== null
+        ? `${protocol}//${location.host}/ws?instanceId=${props.instanceId}`
+        : `${protocol}//${location.host}`;
+      ws = new WebSocket(wsUrl);
 
       // IME
       let isComposing = false;
@@ -96,14 +100,16 @@ export default defineComponent({
           cols: terminal?.cols,
           rows: terminal?.rows,
         }));
-        // 执行初始化命令
-        const cmds = props.initCommands;
-        if (cmds && cmds.length > 0) {
-          setTimeout(() => {
-            for (const cmd of cmds) {
-              ws?.send(cmd + '\n');
-            }
-          }, 200);
+        // 执行初始化命令（仅普通终端）
+        if (props.instanceId === null) {
+          const cmds = props.initCommands;
+          if (cmds && cmds.length > 0) {
+            setTimeout(() => {
+              for (const cmd of cmds) {
+                ws?.send(cmd + '\n');
+              }
+            }, 200);
+          }
         }
       });
 
