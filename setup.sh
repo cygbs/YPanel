@@ -20,7 +20,7 @@ fi
 
 echo "所有必需命令均已找到，继续……"
 
-export YPANEL_VER=1.3
+export YPANEL_VER=1.3.1
 
 # 判断是否需要下载
 if [ -d "$HOME/.ypanel" ]; then
