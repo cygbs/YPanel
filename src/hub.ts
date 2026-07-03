@@ -44,6 +44,7 @@ interface NodeEntry {
   port: number;
   connected: boolean;
   lastSeen: string;
+  icon?: string;
 }
 
 interface PendingToken {
@@ -113,6 +114,20 @@ app.delete('/api/nodes/:id', (req, res) => {
   const ws = nodeConnections.get(id);
   if (ws) { ws.close(); nodeConnections.delete(id); }
   res.json({ ok: true });
+});
+
+/** 更新节点信息 */
+app.put('/api/nodes/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
+  const data = readNodes();
+  const node = data.nodes.find((n: any) => n.id === id);
+  if (!node) { res.status(404).json({ error: 'not found' }); return; }
+  const { name, icon } = req.body;
+  if (name !== undefined) node.name = name;
+  if (icon !== undefined) node.icon = icon;
+  writeNodes(data);
+  res.json(node);
 });
 
 /** 删除 pendingToken */

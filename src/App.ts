@@ -210,6 +210,47 @@ export default defineComponent({
       activeNodeId.value = null;
       instances.value = [];
       selectedId.value = null;
+      selectNode(null);
+    }
+
+    // ── 编辑节点 ──
+    const showEditNodeDialog = ref(false);
+    const editNodeData = reactive({ name: '', icon: 'gear.svg' });
+    const savingNode = ref(false);
+
+    function openEditNode(): void {
+      const n = selectedNodeForMenu.value;
+      if (!n) return;
+      editNodeData.name = n.name;
+      editNodeData.icon = n.icon || 'gear.svg';
+      showIconPicker.value = false;
+      showEditNodeDialog.value = true;
+    }
+
+    function closeEditNode(): void {
+      showEditNodeDialog.value = false;
+      showIconPicker.value = false;
+    }
+
+    async function saveEditNode(): Promise<void> {
+      const n = selectedNodeForMenu.value;
+      if (!n) return;
+      savingNode.value = true;
+      try {
+        const res = await fetch(`/api/nodes/${n.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: editNodeData.name || n.name,
+            icon: editNodeData.icon,
+          }),
+        });
+        if (res.ok) {
+          await loadNodes();
+          closeEditNode();
+        }
+      } catch { /* ignore */ }
+      finally { savingNode.value = false; }
     }
 
     // ── 实例管理 ──
@@ -532,6 +573,8 @@ export default defineComponent({
       nodeError,
       selectedNodeId, selectedNodeForMenu, selectNode,
       openNodeDialog, closeNodeDialog, generateNodeToken,
+      showEditNodeDialog, editNodeData, savingNode,
+      openEditNode, closeEditNode, saveEditNode,
       deleteNode, cancelPendingToken,
       switchToNode, leaveNode,
       // 实例管理
@@ -604,7 +647,7 @@ export default defineComponent({
                 >
                   <div class="inst-icon-wrap">
                     <img class="inst-icon" src="/assets/instances/gear.svg" alt="node" />
-                    <span class="status-dot" :class="node.connected ? 'running' : ''"></span>
+                    <span class="status-dot" :class="node.connected ? 'running' : 'offline'"></span>
                   </div>
                   <span class="inst-name">{{ node.name }}</span>
                 </div>
@@ -621,6 +664,8 @@ export default defineComponent({
                   <div class="fm-actions">
                     <button class="fm-btn" :disabled="!selectedNodeForMenu.connected"
                       @click="switchToNode(selectedNodeForMenu.id)">切换</button>
+                    <button class="fm-btn"
+                      @click="openEditNode">编辑</button>
                     <button class="fm-btn fm-btn-danger"
                       @click="deleteNode(selectedNodeForMenu.id)">删除</button>
                   </div>
@@ -640,7 +685,7 @@ export default defineComponent({
                   @click="selectInstance(inst.id)"
                 >
                   <div class="inst-icon-wrap">
-                    <img class="inst-icon" :src="'/assets/instances/' + inst.icon" :alt="inst.name" />
+                    <img class="inst-icon" :src="'/assets/instances/' + (activeNode?.icon || inst.icon || 'grass.svg')" :alt="inst.name" />
                     <span v-if="runningStates[inst.id]" class="status-dot" :class="runningStates[inst.id]"></span>
                   </div>
                   <span class="inst-name">{{ inst.name }} #{{ inst.id }}</span>
@@ -652,7 +697,7 @@ export default defineComponent({
               <div class="function-menu">
                 <template v-if="selectedInstance">
                   <div class="fm-icon" @click="selectInstance(null)">
-                    <img :src="'/assets/instances/' + selectedInstance.icon" :alt="selectedInstance.name" />
+                    <img :src="'/assets/instances/' + (activeNode?.icon || selectedInstance.icon || 'grass.svg')" :alt="selectedInstance.name" />
                   </div>
                   <div class="fm-name">{{ selectedInstance.name }}</div>
                   <div class="fm-actions">
@@ -731,6 +776,48 @@ export default defineComponent({
           </div>
           <div class="dialog-actions">
             <button class="btn btn-secondary" @click="closeNodeDialog">关闭</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 编辑节点对话框 ===== -->
+      <div v-if="showEditNodeDialog" class="dialog-overlay" @click.self="closeEditNode">
+        <div class="dialog">
+          <div class="dialog-title">编辑节点</div>
+          <div class="dialog-body">
+            <label class="field">
+              <span class="field-label">节点名称</span>
+              <input
+                v-model="editNodeData.name"
+                type="text"
+                class="input"
+                placeholder="节点名称"
+              />
+            </label>
+            <label class="field">
+              <span class="field-label">节点图标</span>
+              <div class="icon-selector" @click="showIconPicker = !showIconPicker">
+                <img class="icon-preview" :src="'/assets/instances/' + editNodeData.icon" :alt="editNodeData.icon" />
+                <span class="icon-name">{{ editNodeData.icon }}</span>
+              </div>
+              <div v-if="showIconPicker" class="icon-grid">
+                <div
+                  v-for="icon in AVAILABLE_ICONS"
+                  :key="icon"
+                  class="icon-option"
+                  :class="{ selected: icon === editNodeData.icon }"
+                  @click="editNodeData.icon = icon"
+                >
+                  <img :src="'/assets/instances/' + icon" :alt="icon" />
+                </div>
+              </div>
+            </label>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-secondary" @click="closeEditNode">取消</button>
+            <button class="btn btn-primary" :disabled="savingNode" @click="saveEditNode">
+              {{ savingNode ? '保存中…' : '保存' }}
+            </button>
           </div>
         </div>
       </div>
