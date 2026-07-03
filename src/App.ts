@@ -1,4 +1,4 @@
-import { defineComponent, reactive, ref, computed } from 'vue';
+import { defineComponent, reactive, ref, computed, watch } from 'vue';
 import TerminalTab from './TerminalTab';
 
 /** 带认证的 fetch */
@@ -271,6 +271,7 @@ export default defineComponent({
         nodeError.value = '网络错误';
       } finally {
         generatingNode.value = false;
+        closeNodeDialog();
       }
     }
 
@@ -285,6 +286,22 @@ export default defineComponent({
         await loadNodes();
       } catch { /* ignore */ }
     }
+
+    /** 复制到剪贴板 */
+    function copyToken(): void {
+      const cmd = `node index.js -s ws://${window.location.host}/link -t ${generatedToken.value} -p 6701`;
+      navigator.clipboard.writeText(cmd).catch(() => {});
+    }
+
+    /** 当 pending token 被消耗（节点连接）时自动关闭 token 对话框 */
+    watch(pendingTokens, (list) => {
+      if (showGeneratedToken.value && generatedToken.value) {
+        const stillPending = list.some(p => p.token === generatedToken.value);
+        if (!stillPending) {
+          showGeneratedToken.value = false;
+        }
+      }
+    });
 
     /** 取消 pending token */
     async function cancelPendingToken(token: string): Promise<void> {
@@ -673,7 +690,7 @@ export default defineComponent({
       generatedToken, generatedNodeName, showGeneratedToken, locationHost,
       nodeError,
       selectedNodeId, selectedNodeForMenu, selectNode,
-      openNodeDialog, closeNodeDialog, generateNodeToken,
+      openNodeDialog, closeNodeDialog, generateNodeToken, copyToken,
       showEditNodeDialog, editNodeData, savingNode,
       openEditNode, closeEditNode, saveEditNode,
       deleteNode, cancelPendingToken,
@@ -872,35 +889,26 @@ export default defineComponent({
         </div>
       </div>
 
-      <!-- ===== 新增节点对话框（生成 Token） ===== -->
+      <!-- ===== 新增节点对话框（仅名称+生成） ===== -->
       <div v-if="showNodeDialog" class="dialog-overlay" @click.self="closeNodeDialog">
-        <div class="dialog">
+        <div class="dialog dialog-sm">
           <div class="dialog-title">新增节点</div>
           <div class="dialog-body">
-            <div class="node-gen-section">
-              <div class="node-gen-row">
-                <input
-                  v-model="newNodeName"
-                  type="text"
-                  class="input"
-                  placeholder="节点名称（可选）"
-                />
-                <button class="btn btn-primary" :disabled="generatingNode" @click="generateNodeToken">
-                  {{ generatingNode ? '生成中…' : '生成 Token' }}
-                </button>
-              </div>
-              <div v-if="nodeError" class="field-error">{{ nodeError }}</div>
-              <div v-if="showGeneratedToken" class="node-token-box">
-                <div class="node-token-label">在目标机器上运行以下命令：</div>
-                <div class="node-token-cmd">
-                  node index.js -s ws://{{ locationHost }}/link -t {{ generatedToken }} -p 6701
-                </div>
-                <div class="node-token-note">节点名称：{{ generatedNodeName }}</div>
-                <div class="node-token-note">节点会保存到数据中，等待连接中…</div>
-              </div>
+            <div class="node-gen-row">
+              <input
+                v-model="newNodeName"
+                type="text"
+                class="input"
+                placeholder="节点名称（可选）"
+                @keyup.enter="generateNodeToken"
+              />
+              <button class="btn btn-primary" :disabled="generatingNode" @click="generateNodeToken">
+                {{ generatingNode ? '生成中…' : '生成 Token' }}
+              </button>
             </div>
+            <div v-if="nodeError" class="field-error">{{ nodeError }}</div>
             <!-- 待处理的 Token -->
-            <div v-if="pendingTokens.length > 0" class="node-list-title">等待连接的 Token</div>
+            <div v-if="pendingTokens.length > 0" class="node-list-title" style="margin-top:12px">等待连接的 Token</div>
             <div v-for="pt in pendingTokens" :key="pt.token" class="node-item pending">
               <div class="node-info">
                 <div class="node-status-dot pending-dot"></div>
@@ -916,6 +924,24 @@ export default defineComponent({
           </div>
           <div class="dialog-actions">
             <button class="btn btn-secondary" @click="closeNodeDialog">关闭</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Token 命令对话框 ===== -->
+      <div v-if="showGeneratedToken" class="dialog-overlay" @click.self="showGeneratedToken = false">
+        <div class="dialog">
+          <div class="dialog-title">新节点「{{ generatedNodeName }}」</div>
+          <div class="dialog-body">
+            <div class="node-token-label" style="margin-bottom:8px">在目标机器上运行以下命令：</div>
+            <div class="token-cmd-box">
+              <code class="token-cmd-text">node index.js -s ws://{{ locationHost }}/link -t {{ generatedToken }} -p 6701</code>
+            </div>
+            <div class="token-cmd-note">节点连接后此窗口将自动关闭。</div>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-primary" @click="copyToken">复制命令</button>
+            <button class="btn btn-secondary" @click="showGeneratedToken = false">关闭</button>
           </div>
         </div>
       </div>
