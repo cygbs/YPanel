@@ -685,7 +685,7 @@ export default defineComponent({
                   @click="selectInstance(inst.id)"
                 >
                   <div class="inst-icon-wrap">
-                    <img class="inst-icon" :src="'/assets/instances/' + (activeNode?.icon || inst.icon || 'grass.svg')" :alt="inst.name" />
+                    <img class="inst-icon" :src="'/assets/instances/' + (inst.icon || 'grass.svg')" :alt="inst.name" />
                     <span v-if="runningStates[inst.id]" class="status-dot" :class="runningStates[inst.id]"></span>
                   </div>
                   <span class="inst-name">{{ inst.name }} #{{ inst.id }}</span>
@@ -697,7 +697,7 @@ export default defineComponent({
               <div class="function-menu">
                 <template v-if="selectedInstance">
                   <div class="fm-icon" @click="selectInstance(null)">
-                    <img :src="'/assets/instances/' + (activeNode?.icon || selectedInstance.icon || 'grass.svg')" :alt="selectedInstance.name" />
+                    <img :src="'/assets/instances/' + (selectedInstance.icon || 'grass.svg')" :alt="selectedInstance.name" />
                   </div>
                   <div class="fm-name">{{ selectedInstance.name }}</div>
                   <div class="fm-actions">
