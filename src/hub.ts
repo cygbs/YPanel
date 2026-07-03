@@ -2,7 +2,7 @@
  * YPanel Hub — 中央面板服务器
  *
  * 职责：
- * - 提供网页面板界面
+ * - 提供网页面板界面（需登录）
  * - 管理节点（注册、列表、删除）
  * - 代理 HTTP 请求到节点上的 API
  * - 代理 WebSocket 终端到节点
@@ -13,6 +13,7 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 
 const app = express();
 const server = http.createServer(app);
@@ -21,8 +22,6 @@ const wss = new WebSocketServer({ server, clientTracking: false });
 app.use(express.json());
 
 // ── 路径解析（兼容 tsx 开发模式与 dist 构建模式） ──
-// tsx 开发模式脚本为 .ts, 构建产物为 .js
-// .ts → 取父级（项目根目录），.js → 取脚本所在目录
 const ROOT_DIR = process.argv[1]?.endsWith('.ts')
   ? path.resolve(__dirname, '..')
   : __dirname;
@@ -31,10 +30,162 @@ app.use(express.static(path.join(ROOT_DIR, 'public')));
 // ── 数据存储 ──
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const NODES_FILE = path.join(DATA_DIR, 'nodes.json');
+const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
 
 function ensureDataDir(): void {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+
+// ═══════════════════════════════════════════════════
+// 认证系统
+// ═══════════════════════════════════════════════════
+
+interface AuthData {
+  username: string;
+  hash: string;            // SHA-256 哈希
+  defaultPassword: boolean; // 是否仍为默认密码
+}
+
+/** SHA-256 哈希 */
+function hashPassword(password: string): string {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+/** 生成随机密码 */
+function randomPassword(len = 12): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let pwd = '';
+  const bytes = crypto.randomBytes(len);
+  for (let i = 0; i < len; i++) {
+    pwd += chars[bytes[i] % chars.length];
+  }
+  return pwd;
+}
+
+function readAuth(): AuthData | null {
+  ensureDataDir();
+  if (!fs.existsSync(AUTH_FILE)) return null;
+  try { return JSON.parse(fs.readFileSync(AUTH_FILE, 'utf-8')); }
+  catch { return null; }
+}
+
+function writeAuth(data: AuthData): void {
+  ensureDataDir();
+  fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+/** 首次运行：生成随机用户名和密码 */
+function initAuth(): { username: string; password: string } {
+  const username = 'admin';
+  const password = randomPassword();
+  writeAuth({
+    username,
+    hash: hashPassword(password),
+    defaultPassword: true,
+  });
+  return { username, password };
+}
+
+// ── Session Token 管理 ──
+const sessions = new Map<string, boolean>(); // token → authenticated
+
+function createToken(): string {
+  const token = crypto.randomUUID();
+  sessions.set(token, true);
+  return token;
+}
+
+// ── 初始化认证（首次运行时生成） ──
+let firstRunCreds: { username: string; password: string } | null = null;
+let authData = readAuth();
+if (!authData) {
+  firstRunCreds = initAuth();
+  authData = readAuth();
+  console.log('');
+  console.log('╔══════════════════════════════════════════╗');
+  console.log('║  首次启动，已生成默认凭据                ║');
+  console.log(`║  用户名: ${(firstRunCreds!.username + '                ').slice(0, 15)}║`);
+  console.log(`║  密码:   ${(firstRunCreds!.password + '                ').slice(0, 15)}║`);
+  console.log('║  请登录后立即修改密码                    ║');
+  console.log('╚══════════════════════════════════════════╝');
+  console.log('');
+}
+
+// ═══════════════════════════════════════════════════
+// API: 认证
+// ═══════════════════════════════════════════════════
+
+/** 登录 */
+app.post('/api/auth/login', (req, res) => {
+  const auth = readAuth();
+  if (!auth) { res.status(500).json({ error: 'auth not initialized' }); return; }
+  const { username, password } = req.body;
+  if (username === auth.username && hashPassword(password) === auth.hash) {
+    const token = createToken();
+    res.json({ token, defaultPassword: auth.defaultPassword });
+  } else {
+    res.status(401).json({ error: 'invalid credentials' });
+  }
+});
+
+/** 验证 token 状态 */
+app.post('/api/auth/check', (req, res) => {
+  const { token } = req.body;
+  if (token && sessions.has(token)) {
+    const auth = readAuth();
+    res.json({ valid: true, defaultPassword: auth?.defaultPassword ?? false });
+  } else {
+    res.json({ valid: false });
+  }
+});
+
+/** 修改密码（需携带有效 token） */
+app.post('/api/auth/change-password', (req, res) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!token || !sessions.has(token)) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+  const auth = readAuth();
+  if (!auth) { res.status(500).json({ error: 'auth not initialized' }); return; }
+  const { oldPassword, newPassword } = req.body;
+  if (hashPassword(oldPassword) !== auth.hash) {
+    res.status(400).json({ error: 'old password is incorrect' });
+    return;
+  }
+  if (!newPassword || newPassword.length === 0) {
+    res.status(400).json({ error: 'new password is required' });
+    return;
+  }
+  auth.hash = hashPassword(newPassword);
+  auth.defaultPassword = false;
+  writeAuth(auth);
+  res.json({ ok: true });
+});
+
+// ═══════════════════════════════════════════════════
+// 认证中间件：保护 /api/* 路由（除 /api/auth/* 外）
+// ═══════════════════════════════════════════════════
+
+app.use('/api', (req, res, next) => {
+  // /api/auth/* 不需要认证
+  if (req.path.startsWith('/auth/')) {
+    next();
+    return;
+  }
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (token && sessions.has(token)) {
+    next();
+  } else {
+    res.status(401).json({ error: 'authentication required' });
+  }
+});
+
+// ═══════════════════════════════════════════════════
+// 以下所有 /api/* 路由现在受认证中间件保护
+// ═══════════════════════════════════════════════════
 
 interface NodeEntry {
   id: number;
@@ -70,7 +221,6 @@ function writeNodes(data: NodesData): void {
   fs.writeFileSync(NODES_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-/** 获取已连接的节点信息 */
 function getConnectedNode(nodeId: number): { address: string; port: number } | null {
   const data = readNodes();
   const node = data.nodes.find(n => n.id === nodeId);
@@ -78,19 +228,14 @@ function getConnectedNode(nodeId: number): { address: string; port: number } | n
   return { address: node.address, port: node.port };
 }
 
-/** 跟踪每个节点当前的 WebSocket 连接（用于 /link） */
 const nodeConnections = new Map<number, WebSocket>();
 
-// ═══════════════════════════════════════════════════
-// API: 节点管理
-// ═══════════════════════════════════════════════════
+// ── API: 节点管理 ──
 
-/** 获取节点列表（含 pendingTokens） */
 app.get('/api/nodes', (_req, res) => {
   res.json(readNodes());
 });
 
-/** 生成待验证 Token（新增节点第一步） */
 app.post('/api/nodes', (req, res) => {
   const { name } = req.body;
   const data = readNodes();
@@ -101,7 +246,6 @@ app.post('/api/nodes', (req, res) => {
   res.json({ token, nodeName });
 });
 
-/** 删除节点 */
 app.delete('/api/nodes/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
@@ -110,13 +254,11 @@ app.delete('/api/nodes/:id', (req, res) => {
   if (idx === -1) { res.status(404).json({ error: 'not found' }); return; }
   data.nodes.splice(idx, 1);
   writeNodes(data);
-  // 断开节点连接
   const ws = nodeConnections.get(id);
   if (ws) { ws.close(); nodeConnections.delete(id); }
   res.json({ ok: true });
 });
 
-/** 更新节点信息 */
 app.put('/api/nodes/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
@@ -130,7 +272,6 @@ app.put('/api/nodes/:id', (req, res) => {
   res.json(node);
 });
 
-/** 删除 pendingToken */
 app.delete('/api/nodes/pending/:token', (req, res) => {
   const data = readNodes();
   const idx = data.pendingTokens.findIndex(p => p.token === req.params.token);
@@ -140,22 +281,13 @@ app.delete('/api/nodes/pending/:token', (req, res) => {
   res.json({ ok: true });
 });
 
-// ═══════════════════════════════════════════════════
-// 代理: 将节点相关的 API 请求转发到节点
-// ═══════════════════════════════════════════════════
+// ── 代理到节点 ──
 
-/** 通用的代理处理函数 */
 async function proxyToNode(nodeId: number, req: express.Request, res: express.Response): Promise<void> {
   const node = getConnectedNode(nodeId);
-  if (!node) {
-    res.status(404).json({ error: 'node not found or offline' });
-    return;
-  }
-
-  // 替换路径: /api/node/:nodeId/xxx → /api/xxx
+  if (!node) { res.status(404).json({ error: 'node not found or offline' }); return; }
   const targetPath = req.originalUrl.replace(/^\/api\/node\/\d+/, '/api');
   const targetUrl = `http://${node.address}:${node.port}${targetPath}`;
-
   try {
     const fetchOptions: RequestInit = {
       method: req.method,
@@ -173,51 +305,19 @@ async function proxyToNode(nodeId: number, req: express.Request, res: express.Re
   }
 }
 
-// ── 实例管理（代理到节点） ──
-
-/** 获取节点上的实例列表 */
-app.get('/api/node/:nodeId/instances', (req, res) =>
-  proxyToNode(parseInt(req.params.nodeId), req, res));
-
-/** 在节点上创建实例 */
-app.post('/api/node/:nodeId/instances', (req, res) =>
-  proxyToNode(parseInt(req.params.nodeId), req, res));
-
-/** 更新节点上的实例 */
-app.put('/api/node/:nodeId/instances/:instanceId', (req, res) =>
-  proxyToNode(parseInt(req.params.nodeId), req, res));
-
-/** 删除节点上的实例 */
-app.delete('/api/node/:nodeId/instances/:instanceId', (req, res) =>
-  proxyToNode(parseInt(req.params.nodeId), req, res));
-
-/** 启动节点上的实例 */
-app.post('/api/node/:nodeId/instances/:instanceId/start', (req, res) =>
-  proxyToNode(parseInt(req.params.nodeId), req, res));
-
-/** 停止节点上的实例 */
-app.post('/api/node/:nodeId/instances/:instanceId/stop', (req, res) =>
-  proxyToNode(parseInt(req.params.nodeId), req, res));
-
-/** 查询节点上实例的状态 */
-app.get('/api/node/:nodeId/instances/:instanceId/status', (req, res) =>
-  proxyToNode(parseInt(req.params.nodeId), req, res));
-
-// ── 设置（代理到节点） ──
-
-app.get('/api/node/:nodeId/settings', (req, res) =>
-  proxyToNode(parseInt(req.params.nodeId), req, res));
-
-app.put('/api/node/:nodeId/settings', (req, res) =>
-  proxyToNode(parseInt(req.params.nodeId), req, res));
+app.get('/api/node/:nodeId/instances', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
+app.post('/api/node/:nodeId/instances', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
+app.put('/api/node/:nodeId/instances/:instanceId', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
+app.delete('/api/node/:nodeId/instances/:instanceId', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
+app.post('/api/node/:nodeId/instances/:instanceId/start', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
+app.post('/api/node/:nodeId/instances/:instanceId/stop', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
+app.get('/api/node/:nodeId/instances/:instanceId/status', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
+app.get('/api/node/:nodeId/settings', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
+app.put('/api/node/:nodeId/settings', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
 
 // ═══════════════════════════════════════════════════
-// /link WebSocket: 节点接入
+// /link WebSocket: 节点接入（不需要认证）
 // ═══════════════════════════════════════════════════
-//
-// 节点连接后发送: { type: "register", token, address, port }
-// Hub 验证 token 后回复: { type: "registered", nodeId }
-// 或: { type: "error", message }
 
 function handleLinkConnection(ws: WebSocket): void {
   let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -225,24 +325,15 @@ function handleLinkConnection(ws: WebSocket): void {
   ws.on('message', (raw) => {
     let msg: any;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
-
     if (msg.type === 'register') {
       const data = readNodes();
       const pIdx = data.pendingTokens.findIndex((p: any) => p.token === msg.token);
       const existing = data.nodes.find((n: any) => n.token === msg.token);
-
       if (pIdx !== -1 || existing) {
-        const nodeName = pIdx !== -1
-          ? data.pendingTokens[pIdx].name
-          : existing!.name;
-
-        if (pIdx !== -1) {
-          data.pendingTokens.splice(pIdx, 1); // 消耗 pending token
-        }
-
+        const nodeName = pIdx !== -1 ? data.pendingTokens[pIdx].name : existing!.name;
+        if (pIdx !== -1) data.pendingTokens.splice(pIdx, 1);
         const now = new Date().toISOString();
         let nodeId: number;
-
         if (existing) {
           nodeId = existing.id;
           existing.address = msg.address;
@@ -251,28 +342,12 @@ function handleLinkConnection(ws: WebSocket): void {
           existing.lastSeen = now;
         } else {
           nodeId = data.nodes.length;
-          data.nodes.push({
-            id: nodeId,
-            name: nodeName,
-            token: msg.token,
-            address: msg.address,
-            port: msg.port || 6701,
-            connected: true,
-            lastSeen: now,
-          });
+          data.nodes.push({ id: nodeId, name: nodeName, token: msg.token, address: msg.address, port: msg.port || 6701, connected: true, lastSeen: now });
         }
-
         writeNodes(data);
-
-        // 记录连接
         nodeConnections.set(nodeId, ws);
-
         ws.send(JSON.stringify({ type: 'registered', nodeId }));
-
-        // 心跳保活
-        heartbeat = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) ws.ping();
-        }, 30000);
+        heartbeat = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
       } else {
         ws.send(JSON.stringify({ type: 'error', message: 'invalid token' }));
         setTimeout(() => ws.close(), 1000);
@@ -282,41 +357,43 @@ function handleLinkConnection(ws: WebSocket): void {
 
   const cleanup = () => {
     if (heartbeat) clearInterval(heartbeat);
-    // 标记所有关联的节点为离线
     const data = readNodes();
     let changed = false;
     for (const [nodeId, conn] of nodeConnections) {
       if (conn === ws) {
         const node = data.nodes.find(n => n.id === nodeId);
-        if (node) {
-          node.connected = false;
-          changed = true;
-        }
+        if (node) { node.connected = false; changed = true; }
         nodeConnections.delete(nodeId);
-        break; // 一个 WS 只对应一个节点
+        break;
       }
     }
     if (changed) writeNodes(data);
   };
-
   ws.on('close', cleanup);
   ws.on('error', cleanup);
 }
 
 // ═══════════════════════════════════════════════════
-// WebSocket: 终端代理 + 节点接入
+// WebSocket: 终端代理（需要 token 认证）
 // ═══════════════════════════════════════════════════
 
 wss.on('connection', (ws: WebSocket, req) => {
   const parsed = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
 
-  // /link 路径 → 节点接入
+  // /link 路径 → 节点接入（无需 token）
   if (parsed.pathname === '/link') {
     handleLinkConnection(ws);
     return;
   }
 
-  // /ws 路径 → 终端代理
+  // /ws 路径 → 终端代理（需验证 token）
+  const token = parsed.searchParams.get('token');
+  if (!token || !sessions.has(token)) {
+    ws.send('Authentication required.\r\n');
+    ws.close();
+    return;
+  }
+
   const nodeIdStr = parsed.searchParams.get('nodeId');
   const instanceIdStr = parsed.searchParams.get('instanceId');
   const nodeId = nodeIdStr ? parseInt(nodeIdStr, 10) : null;
@@ -335,8 +412,6 @@ wss.on('connection', (ws: WebSocket, req) => {
     return;
   }
 
-  // 构建 node 的 WS URL
-  // 有 instanceId → 连接到实例终端；无 instanceId → 连接到节点的普通 Shell
   const nodeQuery = new URLSearchParams();
   if (instanceId !== null && !isNaN(instanceId)) {
     nodeQuery.set('instanceId', String(instanceId));
@@ -344,7 +419,6 @@ wss.on('connection', (ws: WebSocket, req) => {
   const nodeWsUrl = `ws://${node.address}:${node.port}/ws${nodeQuery.toString() ? '?' + nodeQuery.toString() : ''}`;
   console.log(`[proxy] WS: hub → node #${nodeId} ${nodeWsUrl}`);
 
-  // ws 库的消息默认是 Buffer（即使是文本帧），必须转成 string
   function bufToStr(data: any): string {
     if (typeof data === 'string') return data;
     if (Buffer.isBuffer(data)) return data.toString('utf-8');
@@ -358,46 +432,27 @@ wss.on('connection', (ws: WebSocket, req) => {
 
   nodeWs.on('open', () => {
     nodeOpen = true;
-    for (const msg of buffer) {
-      if (nodeWs.readyState === WebSocket.OPEN) nodeWs.send(msg);
-    }
+    for (const msg of buffer) { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.send(msg); }
     buffer = [];
   });
 
-  nodeWs.on('message', (data) => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(bufToStr(data));
-    }
-  });
-
+  nodeWs.on('message', (data) => { if (ws.readyState === WebSocket.OPEN) ws.send(bufToStr(data)); });
   nodeWs.on('close', () => { ws.close(); });
   nodeWs.on('error', () => { ws.close(); });
 
   ws.on('message', (raw) => {
     const text = bufToStr(raw);
-    if (nodeOpen && nodeWs.readyState === WebSocket.OPEN) {
-      nodeWs.send(text);
-    } else if (!nodeOpen) {
-      buffer.push(text);
-    }
+    if (nodeOpen && nodeWs.readyState === WebSocket.OPEN) { nodeWs.send(text); }
+    else if (!nodeOpen) { buffer.push(text); }
   });
-
-  ws.on('close', () => {
-    if (nodeWs.readyState === WebSocket.OPEN) nodeWs.close();
-  });
-
-  ws.on('error', () => {
-    if (nodeWs.readyState === WebSocket.OPEN) nodeWs.close();
-  });
+  ws.on('close', () => { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.close(); });
+  ws.on('error', () => { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.close(); });
 });
 
-// ── 处理 /link 路径 → 将非 WS 请求返回 400 ──
 app.get('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only' }));
 app.post('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only' }));
 
-// ═══════════════════════════════════════════════════
-// Hub 设置
-// ═══════════════════════════════════════════════════
+// ── Hub 设置 ──
 
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 
@@ -430,4 +485,7 @@ const PORT = parseInt(process.env.PORT || '6699', 10);
 server.listen(PORT, () => {
   console.log(`YPanel Hub running on http://localhost:${PORT}`);
   console.log(`  Node link: ws://localhost:${PORT}/link`);
+  if (!firstRunCreds) {
+    console.log('  Use existing credentials to login');
+  }
 });

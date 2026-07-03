@@ -1,6 +1,16 @@
 import { defineComponent, reactive, ref, computed } from 'vue';
 import TerminalTab from './TerminalTab';
 
+/** 带认证的 fetch */
+function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = localStorage.getItem('ypanel_token');
+  const headers = { ...(options.headers || {}) } as Record<string, string>;
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  return fetch(url, { ...options, headers });
+}
+
+const AUTH_TOKEN_KEY = 'ypanel_token';
+
 interface TabData {
   id: number;
   title: string;
@@ -44,6 +54,86 @@ interface NewInstanceData {
 export default defineComponent({
   components: { TerminalTab },
   setup() {
+    // ── 认证状态 ──
+    const authState = ref<'loading' | 'login' | 'change-password' | 'authenticated'>('loading');
+    const loginUsername = ref('');
+    const loginPassword = ref('');
+    const loginError = ref('');
+    const changeOldPassword = ref('');
+    const changeNewPassword = ref('');
+    const changeError = ref('');
+    const changingPassword = ref(false);
+
+    async function checkAuth(): Promise<void> {
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      if (!token) { authState.value = 'login'; return; }
+      try {
+        const res = await fetch('/api/auth/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+        if (data.valid) {
+          if (data.defaultPassword) {
+            authState.value = 'change-password';
+          } else {
+            authState.value = 'authenticated';
+          }
+        } else {
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+          authState.value = 'login';
+        }
+      } catch {
+        authState.value = 'login';
+      }
+    }
+
+    async function doLogin(): Promise<void> {
+      loginError.value = '';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: loginUsername.value, password: loginPassword.value }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+          if (data.defaultPassword) {
+            authState.value = 'change-password';
+          } else {
+            authState.value = 'authenticated';
+          }
+        } else {
+          loginError.value = data.error || '登录失败';
+        }
+      } catch { loginError.value = '网络错误'; }
+    }
+
+    async function doChangePassword(): Promise<void> {
+      changeError.value = '';
+      changingPassword.value = true;
+      try {
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        const res = await fetch('/api/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') },
+          body: JSON.stringify({ oldPassword: changeOldPassword.value, newPassword: changeNewPassword.value }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          authState.value = 'authenticated';
+        } else {
+          changeError.value = data.error || '修改失败';
+        }
+      } catch { changeError.value = '网络错误'; }
+      finally { changingPassword.value = false; }
+    }
+
+    // 启动时检查认证
+    checkAuth();
+
     // ── 标签页 ──
     const tabs = reactive<TabData[]>([
       { id: 0, title: '主页', type: 'home' },
@@ -113,7 +203,7 @@ export default defineComponent({
     /** 加载节点列表 */
     async function loadNodes(): Promise<void> {
       try {
-        const res = await fetch('/api/nodes');
+        const res = await apiFetch('/api/nodes');
         if (res.ok) {
           const data = await res.json();
           nodes.value = data.nodes || [];
@@ -155,7 +245,7 @@ export default defineComponent({
       generatingNode.value = true;
       nodeError.value = '';
       try {
-        const res = await fetch('/api/nodes', {
+        const res = await apiFetch('/api/nodes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: newNodeName.value || undefined }),
@@ -181,7 +271,7 @@ export default defineComponent({
     async function deleteNode(id: number): Promise<void> {
       if (!confirm('确定删除此节点？')) return;
       try {
-        await fetch(`/api/nodes/${id}`, { method: 'DELETE' });
+        await apiFetch(`/api/nodes/${id}`, { method: 'DELETE' });
         if (activeNodeId.value === id) {
           activeNodeId.value = null;
         }
@@ -192,7 +282,7 @@ export default defineComponent({
     /** 取消 pending token */
     async function cancelPendingToken(token: string): Promise<void> {
       try {
-        await fetch(`/api/nodes/pending/${token}`, { method: 'DELETE' });
+        await apiFetch(`/api/nodes/pending/${token}`, { method: 'DELETE' });
         await loadNodes();
       } catch { /* ignore */ }
     }
@@ -237,7 +327,7 @@ export default defineComponent({
       if (!n) return;
       savingNode.value = true;
       try {
-        const res = await fetch(`/api/nodes/${n.id}`, {
+        const res = await apiFetch(`/api/nodes/${n.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -316,7 +406,7 @@ export default defineComponent({
       showIconPicker.value = false;
       showNewDialog.value = true;
       try {
-        const res = await fetch(apiPrefix() + '/instances/' + inst.id + '/status');
+        const res = await apiFetch(apiPrefix() + '/instances/' + inst.id + '/status');
         if (res.ok) {
           const data = await res.json();
           runningStates[inst.id] = data.running ? 'running' : false;
@@ -345,7 +435,7 @@ export default defineComponent({
       const prefix = apiPrefix();
       if (!prefix) return;
       try {
-        const res = await fetch(prefix + '/instances');
+        const res = await apiFetch(prefix + '/instances');
         if (res.ok) {
           const data = await res.json();
           instances.value = data.instances || [];
@@ -364,7 +454,7 @@ export default defineComponent({
       if (!prefix) return;
       for (const inst of instances.value) {
         try {
-          const res = await fetch(prefix + '/instances/' + inst.id + '/status');
+          const res = await apiFetch(prefix + '/instances/' + inst.id + '/status');
           if (res.ok) {
             const data = await res.json();
             if (data.running) {
@@ -386,7 +476,7 @@ export default defineComponent({
       if (!inst || activeNodeId.value === null) return;
       const prefix = apiPrefix();
       try {
-        const res = await fetch(prefix + '/instances/' + inst.id + '/start', { method: 'POST' });
+        const res = await apiFetch(prefix + '/instances/' + inst.id + '/start', { method: 'POST' });
         if (!res.ok) {
           console.error('start failed:', res.status, await res.text());
           return;
@@ -433,7 +523,7 @@ export default defineComponent({
       if (!inst || activeNodeId.value === null) return;
       const prefix = apiPrefix();
       runningStates[inst.id] = 'stopping';
-      await fetch(prefix + '/instances/' + inst.id + '/stop', { method: 'POST' });
+      await apiFetch(prefix + '/instances/' + inst.id + '/stop', { method: 'POST' });
       setTimeout(() => pollStatus(), 3000);
     }
 
@@ -457,7 +547,7 @@ export default defineComponent({
       try {
         if (isEditing.value && editingId.value !== null) {
           // 编辑
-          const res = await fetch(prefix + '/instances/' + editingId.value, {
+          const res = await apiFetch(prefix + '/instances/' + editingId.value, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -474,7 +564,7 @@ export default defineComponent({
           }
         } else {
           // 新建
-          const res = await fetch(prefix + '/instances', {
+          const res = await apiFetch(prefix + '/instances', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -503,7 +593,7 @@ export default defineComponent({
       const prefix = apiPrefix();
       if (!prefix) { showSettings.value = false; return; }
       try {
-        const res = await fetch(prefix + '/settings');
+        const res = await apiFetch(prefix + '/settings');
         if (res.ok) {
           const data = await res.json();
           settings.defaultShell = data.defaultShell || '/usr/bin/bash';
@@ -519,7 +609,7 @@ export default defineComponent({
       savingSettings.value = true;
       const prefix = apiPrefix();
       try {
-        await fetch(prefix + '/settings', {
+        await apiFetch(prefix + '/settings', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ defaultShell: settings.defaultShell }),
@@ -543,7 +633,7 @@ export default defineComponent({
       if (id === null || activeNodeId.value === null) return;
       const prefix = apiPrefix();
       try {
-        const res = await fetch(prefix + '/instances/' + id, { method: 'DELETE' });
+        const res = await apiFetch(prefix + '/instances/' + id, { method: 'DELETE' });
         if (res.ok) {
           instances.value = instances.value.filter((i) => i.id !== id);
           selectedId.value = null;
@@ -563,6 +653,10 @@ export default defineComponent({
     const locationHost = window.location.host;
 
     return {
+      // 认证
+      authState, loginUsername, loginPassword, loginError,
+      changeOldPassword, changeNewPassword, changeError,
+      changingPassword, doLogin, doChangePassword,
       // 标签页
       tabs, activeId, terminalTabs,
       addTerminalTab, closeTab, switchTab, setTabRef,
@@ -591,7 +685,49 @@ export default defineComponent({
     };
   },
   template: `
-    <div class="app-layout">
+    <!-- ===== 加载中 ===== -->
+    <div v-if="authState === 'loading'" class="auth-screen">
+      <div class="auth-box">
+        <div class="auth-loading">正在加载…</div>
+      </div>
+    </div>
+
+    <!-- ===== 登录页 ===== -->
+    <div v-else-if="authState === 'login'" class="auth-screen">
+      <div class="auth-box">
+        <div class="auth-title">YPanel</div>
+        <div class="auth-subtitle">请登录</div>
+        <div class="auth-field">
+          <input v-model="loginUsername" type="text" class="input" placeholder="用户名" @keyup.enter="doLogin" />
+        </div>
+        <div class="auth-field">
+          <input v-model="loginPassword" type="password" class="input" placeholder="密码" @keyup.enter="doLogin" />
+        </div>
+        <div v-if="loginError" class="auth-error">{{ loginError }}</div>
+        <button class="btn btn-primary auth-btn" @click="doLogin">登录</button>
+      </div>
+    </div>
+
+    <!-- ===== 修改默认密码 ===== -->
+    <div v-else-if="authState === 'change-password'" class="auth-screen">
+      <div class="auth-box">
+        <div class="auth-title">YPanel</div>
+        <div class="auth-subtitle">请修改默认密码</div>
+        <div class="auth-field">
+          <input v-model="changeOldPassword" type="password" class="input" placeholder="当前密码" @keyup.enter="doChangePassword" />
+        </div>
+        <div class="auth-field">
+          <input v-model="changeNewPassword" type="password" class="input" placeholder="新密码" @keyup.enter="doChangePassword" />
+        </div>
+        <div v-if="changeError" class="auth-error">{{ changeError }}</div>
+        <button class="btn btn-primary auth-btn" :disabled="changingPassword" @click="doChangePassword">
+          {{ changingPassword ? '保存中…' : '保存' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== 主界面 ===== -->
+    <div v-else class="app-layout">
       <!-- 标签栏 -->
       <div class="tab-bar">
         <div class="tabs-scroll">
