@@ -1,12 +1,12 @@
 # YPanel
 A web panel for Minecraft server.
 
-这是一个简单的网页面板，适用于Minecraft服务器，或者是别的什么程序。它使用TypeScript、Vue.js等编写。
+这是一个简单的网页面板，适用于Minecraft服务器，或者是别的什么程序。它使用TypeScript、Vue.js等编写。实例图标来自[Prism Launcher](https://prismlauncher.org)，整体上也参考了它的设计。
 
 ## 优势
 
 - 极简，占用低、加载速度快。
-- 支持控制多个服务器。
+- 支持控制多个服务器，并且面板本身只需要占用一台服务器的一个端口。
 - 不仅仅是Minecraft服务器，理论上支持所有控制台程序。
 
 你可以[在这里](https://github.com/cygbs/YPanel/tree/main/images)预览这个面板。

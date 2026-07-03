@@ -32,18 +32,24 @@ if (fs.existsSync(path.join(ROOT, 'data', 'instances.json'))) {
   fs.cpSync(path.join(ROOT, 'data'), path.join(NODE_DIST, 'data'), { recursive: true, force: true });
 }
 
-// 2. 复制 node-pty 原生模块
+// 2. 复制 node-pty 原生模块（跨平台）
 const NPTY_SRC = path.join(ROOT, 'node_modules', 'node-pty');
 const NPTY_DIST = path.join(NODE_DIST, 'node_modules', 'node-pty');
 if (fs.existsSync(NPTY_SRC)) {
-  fs.mkdirSync(path.join(NPTY_DIST, 'lib'), { recursive: true });
-  fs.mkdirSync(path.join(NPTY_DIST, 'build', 'Release'), { recursive: true });
-  const jsFiles = fs.readdirSync(path.join(NPTY_SRC, 'lib')).filter(f => f.endsWith('.js'));
-  for (const f of jsFiles) {
-    fs.cpSync(path.join(NPTY_SRC, 'lib', f), path.join(NPTY_DIST, 'lib', f));
+  // lib/ — JS 运行时
+  fs.cpSync(path.join(NPTY_SRC, 'lib'), path.join(NPTY_DIST, 'lib'), { recursive: true, force: true });
+  // package.json — 模块元数据
+  fs.cpSync(path.join(NPTY_SRC, 'package.json'), path.join(NPTY_DIST, 'package.json'), { force: true });
+  // build/Release/pty.node — Linux x64 二进制
+  if (fs.existsSync(path.join(NPTY_SRC, 'build', 'Release', 'pty.node'))) {
+    fs.mkdirSync(path.join(NPTY_DIST, 'build', 'Release'), { recursive: true });
+    fs.cpSync(path.join(NPTY_SRC, 'build', 'Release', 'pty.node'), path.join(NPTY_DIST, 'build', 'Release', 'pty.node'));
   }
-  fs.cpSync(path.join(NPTY_SRC, 'build', 'Release', 'pty.node'), path.join(NPTY_DIST, 'build', 'Release', 'pty.node'));
-  fs.cpSync(path.join(NPTY_SRC, 'package.json'), path.join(NPTY_DIST, 'package.json'));
+  // prebuilds/ — macOS (x64+arm64) + Windows (x64+arm64) 预编译二进制
+  if (fs.existsSync(path.join(NPTY_SRC, 'prebuilds'))) {
+    fs.cpSync(path.join(NPTY_SRC, 'prebuilds'), path.join(NPTY_DIST, 'prebuilds'), { recursive: true, force: true });
+  }
+  console.log('  node-pty: Linux x64 + prebuilds for macOS/Windows');
 }
 
 console.log('Node dist built: run node dist-node/index.js -s <hub-url> -t <token> [-p <port>]');
