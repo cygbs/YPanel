@@ -47,9 +47,29 @@ if (fs.existsSync(NPTY_SRC)) {
   }
   // prebuilds/ — macOS (x64+arm64) + Windows (x64+arm64) 预编译二进制
   if (fs.existsSync(path.join(NPTY_SRC, 'prebuilds'))) {
+    // 如果缺少 linux-arm64，尝试构建
+    const arm64Prebuild = path.join(NPTY_SRC, 'prebuilds', 'linux-arm64', 'pty.node');
+    if (!fs.existsSync(arm64Prebuild)) {
+      console.log('  Building linux-arm64 pty.node (cross-compile)...');
+      const { execSync } = require('child_process');
+      try {
+        execSync('npx node-gyp rebuild', {
+          cwd: NPTY_SRC,
+          env: { ...process.env, CC: 'aarch64-linux-gnu-gcc-12', CXX: 'aarch64-linux-gnu-g++-12' },
+          stdio: 'pipe',
+        });
+        fs.mkdirSync(path.dirname(arm64Prebuild), { recursive: true });
+        fs.cpSync(path.join(NPTY_SRC, 'build', 'Release', 'pty.node'), arm64Prebuild);
+        // 恢复 x64 构建
+        execSync('npx node-gyp rebuild', { cwd: NPTY_SRC, stdio: 'pipe' });
+        console.log('  linux-arm64 pty.node built');
+      } catch (e) {
+        console.log('  (skipped, cross-compiler not available)');
+      }
+    }
     fs.cpSync(path.join(NPTY_SRC, 'prebuilds'), path.join(NPTY_DIST, 'prebuilds'), { recursive: true, force: true });
   }
-  console.log('  node-pty: Linux x64 + prebuilds for macOS/Windows');
+  console.log('  node-pty: Linux x64+arm64 + macOS x64+arm64 + Windows x64+arm64');
 }
 
 console.log('Node dist built: run node dist-node/index.js -s <hub-url> -t <token> [-p <port>]');
