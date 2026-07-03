@@ -646,7 +646,7 @@ export default defineComponent({
                   @click="selectNode(node.id)"
                 >
                   <div class="inst-icon-wrap">
-                    <img class="inst-icon" src="/assets/instances/gear.svg" alt="node" />
+                    <img class="inst-icon" :src="'/assets/instances/' + (node.icon || 'gear.svg')" :alt="node.name" />
                     <span class="status-dot" :class="node.connected ? 'running' : 'offline'"></span>
                   </div>
                   <span class="inst-name">{{ node.name }}</span>
@@ -658,7 +658,7 @@ export default defineComponent({
               <div class="function-menu">
                 <template v-if="selectedNodeForMenu">
                   <div class="fm-icon" @click="selectNode(null)">
-                    <img src="/assets/instances/gear.svg" />
+                    <img :src="'/assets/instances/' + (selectedNodeForMenu.icon || 'gear.svg')" />
                   </div>
                   <div class="fm-name">{{ selectedNodeForMenu.name }}</div>
                   <div class="fm-actions">
