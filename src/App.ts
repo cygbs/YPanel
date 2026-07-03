@@ -661,7 +661,7 @@ export default defineComponent({
 
     return {
       // 认证
-      authState, loginUsername, loginPassword, loginError,
+      authState, loginPassword, loginError,
       changeNewPassword, changeConfirmPassword, changeError,
       changingPassword, doLogin, doChangePassword,
       // 标签页

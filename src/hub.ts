@@ -41,7 +41,6 @@ function ensureDataDir(): void {
 // ═══════════════════════════════════════════════════
 
 interface AuthData {
-  username: string;
   hash: string;            // SHA-256 哈希
   defaultPassword: boolean; // 是否仍为默认密码
 }
@@ -75,14 +74,10 @@ function writeAuth(data: AuthData): void {
 }
 
 /** 首次运行：生成随机密码 */
-function initAuth(): { username: string; password: string } {
+function initAuth(): { password: string } {
   const password = randomPassword();
-  writeAuth({
-    username: 'admin',
-    hash: hashPassword(password),
-    defaultPassword: true,
-  });
-  return { username: 'admin', password };
+  writeAuth({ hash: hashPassword(password), defaultPassword: true });
+  return { password };
 }
 
 // ── Session Token 管理 ──
@@ -95,7 +90,7 @@ function createToken(): string {
 }
 
 // ── 初始化认证（首次运行时生成） ──
-let firstRunCreds: { username: string; password: string } | null = null;
+let firstRunCreds: { password: string } | null = null;
 let authData = readAuth();
 if (!authData) {
   firstRunCreds = initAuth();
