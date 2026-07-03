@@ -56,11 +56,10 @@ export default defineComponent({
   setup() {
     // ── 认证状态 ──
     const authState = ref<'loading' | 'login' | 'change-password' | 'authenticated'>('loading');
-    const loginUsername = ref('');
     const loginPassword = ref('');
     const loginError = ref('');
-    const changeOldPassword = ref('');
     const changeNewPassword = ref('');
+    const changeConfirmPassword = ref('');
     const changeError = ref('');
     const changingPassword = ref(false);
 
@@ -95,7 +94,7 @@ export default defineComponent({
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: loginUsername.value, password: loginPassword.value }),
+          body: JSON.stringify({ password: loginPassword.value }),
         });
         const data = await res.json();
         if (res.ok) {
@@ -113,13 +112,21 @@ export default defineComponent({
 
     async function doChangePassword(): Promise<void> {
       changeError.value = '';
+      if (changeNewPassword.value !== changeConfirmPassword.value) {
+        changeError.value = '两次输入的密码不一致';
+        return;
+      }
+      if (!changeNewPassword.value) {
+        changeError.value = '密码不能为空';
+        return;
+      }
       changingPassword.value = true;
       try {
         const token = localStorage.getItem(AUTH_TOKEN_KEY);
         const res = await fetch('/api/auth/change-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') },
-          body: JSON.stringify({ oldPassword: changeOldPassword.value, newPassword: changeNewPassword.value }),
+          body: JSON.stringify({ newPassword: changeNewPassword.value }),
         });
         const data = await res.json();
         if (res.ok) {
@@ -655,7 +662,7 @@ export default defineComponent({
     return {
       // 认证
       authState, loginUsername, loginPassword, loginError,
-      changeOldPassword, changeNewPassword, changeError,
+      changeNewPassword, changeConfirmPassword, changeError,
       changingPassword, doLogin, doChangePassword,
       // 标签页
       tabs, activeId, terminalTabs,
@@ -698,9 +705,6 @@ export default defineComponent({
         <div class="auth-title">YPanel</div>
         <div class="auth-subtitle">请登录</div>
         <div class="auth-field">
-          <input v-model="loginUsername" type="text" class="input" placeholder="用户名" @keyup.enter="doLogin" />
-        </div>
-        <div class="auth-field">
           <input v-model="loginPassword" type="password" class="input" placeholder="密码" @keyup.enter="doLogin" />
         </div>
         <div v-if="loginError" class="auth-error">{{ loginError }}</div>
@@ -714,10 +718,10 @@ export default defineComponent({
         <div class="auth-title">YPanel</div>
         <div class="auth-subtitle">请修改默认密码</div>
         <div class="auth-field">
-          <input v-model="changeOldPassword" type="password" class="input" placeholder="当前密码" @keyup.enter="doChangePassword" />
+          <input v-model="changeNewPassword" type="password" class="input" placeholder="新密码" @keyup.enter="doChangePassword" />
         </div>
         <div class="auth-field">
-          <input v-model="changeNewPassword" type="password" class="input" placeholder="新密码" @keyup.enter="doChangePassword" />
+          <input v-model="changeConfirmPassword" type="password" class="input" placeholder="重复新密码" @keyup.enter="doChangePassword" />
         </div>
         <div v-if="changeError" class="auth-error">{{ changeError }}</div>
         <button class="btn btn-primary auth-btn" :disabled="changingPassword" @click="doChangePassword">

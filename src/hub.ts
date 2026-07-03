@@ -74,16 +74,15 @@ function writeAuth(data: AuthData): void {
   fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-/** 首次运行：生成随机用户名和密码 */
+/** 首次运行：生成随机密码 */
 function initAuth(): { username: string; password: string } {
-  const username = 'admin';
   const password = randomPassword();
   writeAuth({
-    username,
+    username: 'admin',
     hash: hashPassword(password),
     defaultPassword: true,
   });
-  return { username, password };
+  return { username: 'admin', password };
 }
 
 // ── Session Token 管理 ──
@@ -102,12 +101,8 @@ if (!authData) {
   firstRunCreds = initAuth();
   authData = readAuth();
   console.log('');
-  console.log('╔══════════════════════════════════════════╗');
-  console.log('║  首次启动，已生成默认凭据                ║');
-  console.log(`║  用户名: ${(firstRunCreds!.username + '                ').slice(0, 15)}║`);
-  console.log(`║  密码:   ${(firstRunCreds!.password + '                ').slice(0, 15)}║`);
-  console.log('║  请登录后立即修改密码                    ║');
-  console.log('╚══════════════════════════════════════════╝');
+  console.log(`Random password: ${firstRunCreds!.password}`);
+  console.log('Please change the password after login.');
   console.log('');
 }
 
@@ -115,17 +110,17 @@ if (!authData) {
 // API: 认证
 // ═══════════════════════════════════════════════════
 
-/** 登录 */
+/** 登录（仅需密码，用户名固定为 admin） */
 app.post('/api/auth/login', (req, res) => {
   const auth = readAuth();
   if (!auth) { res.status(500).json({ error: 'auth not initialized' }); return; }
-  const { username, password } = req.body;
-  if (username === auth.username && hashPassword(password) === auth.hash) {
-    const token = createToken();
-    res.json({ token, defaultPassword: auth.defaultPassword });
-  } else {
+  const { password } = req.body;
+  if (!password || !auth.hash || hashPassword(password) !== auth.hash) {
     res.status(401).json({ error: 'invalid credentials' });
+    return;
   }
+  const token = createToken();
+  res.json({ token, defaultPassword: auth.defaultPassword });
 });
 
 /** 验证 token 状态 */
@@ -149,11 +144,7 @@ app.post('/api/auth/change-password', (req, res) => {
   }
   const auth = readAuth();
   if (!auth) { res.status(500).json({ error: 'auth not initialized' }); return; }
-  const { oldPassword, newPassword } = req.body;
-  if (hashPassword(oldPassword) !== auth.hash) {
-    res.status(400).json({ error: 'old password is incorrect' });
-    return;
-  }
+  const { newPassword } = req.body;
   if (!newPassword || newPassword.length === 0) {
     res.status(400).json({ error: 'new password is required' });
     return;
