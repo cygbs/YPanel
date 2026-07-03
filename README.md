@@ -14,6 +14,16 @@ A web panel for Minecraft server.
 
 ## 运行
 
+如果你的系统有systemd，**使用下面的命令一键安装：**
+
+```bash
+curl https://raw.githubusercontent.com/cygbs/YPanel/refs/heads/main/setup.sh | bash
+```
+
+请先按1配置`Hub`，然后新建节点并复制命令，按2再粘贴进去来配置`Node`，等待节点出现后关闭对话框即可。**绝对不要使用root权限运行安装脚本和面板！运行面板的账户最好保证权限最小化。**
+
+**手动：**
+
 从[Releases](https://github.com/cygbs/YPanel/releases)下载`YPanel.zip`，解压之后，`dist`是`Hub`部分，`dist-node`是`Node`部分，需要配合使用。启动方法是`node index.js`。
 
 ## 编译
