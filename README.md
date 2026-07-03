@@ -9,6 +9,8 @@ A web panel for Minecraft server.
 - 支持控制多个服务器。
 - 不仅仅是Minecraft服务器，理论上支持所有控制台程序。
 
+你可以[在这里](https://github.com/cygbs/YPanel/tree/main/images)预览这个面板。
+
 ## 编译运行
 
 要编译这个程序，请[安装好Node.js环境](https://nodejs.org/zh-cn/download)，然后执行`npm i`和`npm run build`命令。结束后，`dist`是本程序的`Hub`部分，而`dist-node`是`Node`部分。
