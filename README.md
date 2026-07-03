@@ -14,6 +14,8 @@ A web panel for Minecraft server.
 
 ## 运行
 
+无论如何，先确保有Node.js环境。请[安装好Node.js环境](https://nodejs.org/zh-cn/download)。
+
 如果你的系统有systemd，**使用下面的命令一键安装：**
 
 ```bash
@@ -34,7 +36,6 @@ curl https://raw.githubusercontent.com/cygbs/YPanel/refs/heads/main/setup.sh | b
 
 ## todo
 
-- 实现登录系统。
 - 实现插件系统。
 
 ## 许可证
