@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export YPANEL_VER=1.3.2
+
 # 定义需要检查的命令列表
 commands=("curl" "unzip" "systemctl" "node")
 
@@ -19,8 +21,6 @@ if [ $missing -eq 1 ]; then
 fi
 
 echo "所有必需命令均已找到，继续……"
-
-export YPANEL_VER=1.3.1
 
 # 判断是否需要下载
 if [ -d "$HOME/.ypanel" ]; then
