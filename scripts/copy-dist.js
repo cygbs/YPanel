@@ -1,75 +1,99 @@
 /**
- * 构建后辅助脚本：
- * 将运行时依赖和静态资源复制到 dist/（Hub）和 dist-node/（Node）
+ * 构建后辅助脚本
+ * 将 Hub / Node 所需的运行时依赖和静态资源复制到输出目录
  */
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 
-// ── Hub 构建输出：dist/ ──
+// ─── Hub 输出 ───────────────────────────────────────────
 const HUB_DIST = path.join(ROOT, 'dist');
 fs.mkdirSync(HUB_DIST, { recursive: true });
 
-// 1. 复制 public/ 静态文件（前端界面）
+// 前端静态资源
 fs.cpSync(path.join(ROOT, 'public'), path.join(HUB_DIST, 'public'), { recursive: true, force: true });
 
-// 2. 初始化 data/ 目录（如有 node 数据则保留）
+// data 目录（保留已有 nodes.json）
 fs.mkdirSync(path.join(HUB_DIST, 'data'), { recursive: true });
-if (fs.existsSync(path.join(ROOT, 'data', 'nodes.json'))) {
-  fs.cpSync(path.join(ROOT, 'data', 'nodes.json'), path.join(HUB_DIST, 'data', 'nodes.json'), { force: true });
+const nodesJson = path.join(ROOT, 'data', 'nodes.json');
+if (fs.existsSync(nodesJson)) {
+  fs.cpSync(nodesJson, path.join(HUB_DIST, 'data', 'nodes.json'), { force: true });
 }
+console.log('Hub dist built: run node dist/index.js');
 
-console.log('Hub dist built:  run node dist/index.js');
-
-// ── Node 构建输出：dist-node/ ──
+// ─── Node 输出 ───────────────────────────────────────────
 const NODE_DIST = path.join(ROOT, 'dist-node');
 fs.mkdirSync(NODE_DIST, { recursive: true });
 
-// 1. 复制 data/（instances.json, settings.json）
+// data 目录
 fs.mkdirSync(path.join(NODE_DIST, 'data'), { recursive: true });
-if (fs.existsSync(path.join(ROOT, 'data', 'instances.json'))) {
-  fs.cpSync(path.join(ROOT, 'data'), path.join(NODE_DIST, 'data'), { recursive: true, force: true });
+const dataDir = path.join(ROOT, 'data');
+if (fs.existsSync(dataDir)) {
+  fs.cpSync(dataDir, path.join(NODE_DIST, 'data'), { recursive: true, force: true });
 }
 
-// 2. 复制 node-pty 原生模块（跨平台）
-const NPTY_SRC = path.join(ROOT, 'node_modules', 'node-pty');
-const NPTY_DIST = path.join(NODE_DIST, 'node_modules', 'node-pty');
-if (fs.existsSync(NPTY_SRC)) {
-  // lib/ — JS 运行时
-  fs.cpSync(path.join(NPTY_SRC, 'lib'), path.join(NPTY_DIST, 'lib'), { recursive: true, force: true });
-  // package.json — 模块元数据
-  fs.cpSync(path.join(NPTY_SRC, 'package.json'), path.join(NPTY_DIST, 'package.json'), { force: true });
-  // build/Release/pty.node — Linux x64 二进制
-  if (fs.existsSync(path.join(NPTY_SRC, 'build', 'Release', 'pty.node'))) {
-    fs.mkdirSync(path.join(NPTY_DIST, 'build', 'Release'), { recursive: true });
-    fs.cpSync(path.join(NPTY_SRC, 'build', 'Release', 'pty.node'), path.join(NPTY_DIST, 'build', 'Release', 'pty.node'));
+// ── 处理 node-pty 原生模块 ──
+const PTY_SRC = path.join(ROOT, 'node_modules', 'node-pty');
+const PTY_DST = path.join(NODE_DIST, 'node_modules', 'node-pty');
+
+// 1. 复制 JS 运行时 & 元数据（lib + package.json）
+fs.cpSync(path.join(PTY_SRC, 'lib'), path.join(PTY_DST, 'lib'), { recursive: true, force: true });
+fs.cpSync(path.join(PTY_SRC, 'package.json'), path.join(PTY_DST, 'package.json'), { force: true });
+
+// 2. 获取 pty.node 二进制（按优先级尝试）
+let binaryCopied = false;
+
+// 优先级 1：官方预编译包 prebuilds（例如 npm i 时下载的）
+const platformArch = `${process.platform}-${process.arch}`;  // linux-x64
+const prebuildFile = path.join(PTY_SRC, 'prebuilds', platformArch, 'pty.node');
+if (fs.existsSync(prebuildFile)) {
+  // 复制整个 prebuilds 目录（包含所有平台，方便分发）
+  fs.cpSync(
+    path.join(PTY_SRC, 'prebuilds'),
+    path.join(PTY_DST, 'prebuilds'),
+    { recursive: true, force: true }
+  );
+  console.log(`  node-pty: prebuilds copied (including ${platformArch})`);
+  binaryCopied = true;
+}
+
+// 优先级 2：从 node-gyp 编译产物 build/Release 直接复制
+if (!binaryCopied) {
+  const buildRelease = path.join(PTY_SRC, 'build', 'Release', 'pty.node');
+  if (fs.existsSync(buildRelease)) {
+    fs.mkdirSync(path.join(PTY_DST, 'build', 'Release'), { recursive: true });
+    fs.cpSync(buildRelease, path.join(PTY_DST, 'build', 'Release', 'pty.node'));
+    console.log('  node-pty: build/Release/pty.node copied');
+    binaryCopied = true;
   }
-  // prebuilds/ — macOS (x64+arm64) + Windows (x64+arm64) 预编译二进制
-  if (fs.existsSync(path.join(NPTY_SRC, 'prebuilds'))) {
-    // 如果缺少 linux-arm64，尝试构建
-    const arm64Prebuild = path.join(NPTY_SRC, 'prebuilds', 'linux-arm64', 'pty.node');
-    if (!fs.existsSync(arm64Prebuild)) {
-      console.log('  Building linux-arm64 pty.node (cross-compile)...');
-      const { execSync } = require('child_process');
-      try {
-        execSync('npx node-gyp rebuild', {
-          cwd: NPTY_SRC,
-          env: { ...process.env, CC: 'aarch64-linux-gnu-gcc-12', CXX: 'aarch64-linux-gnu-g++-12' },
-          stdio: 'pipe',
-        });
-        fs.mkdirSync(path.dirname(arm64Prebuild), { recursive: true });
-        fs.cpSync(path.join(NPTY_SRC, 'build', 'Release', 'pty.node'), arm64Prebuild);
-        // 恢复 x64 构建
-        execSync('npx node-gyp rebuild', { cwd: NPTY_SRC, stdio: 'pipe' });
-        console.log('  linux-arm64 pty.node built');
-      } catch (e) {
-        console.log('  (skipped, cross-compiler not available)');
-      }
+}
+
+// 优先级 3：以上都无，尝试现场编译（需要 node-gyp 和 C++ 工具链）
+if (!binaryCopied) {
+  console.log('  node-pty: no binary found, trying to rebuild...');
+  try {
+    require('child_process').execSync('npx node-gyp rebuild', {
+      cwd: PTY_SRC,
+      stdio: 'pipe'
+    });
+    const freshBuild = path.join(PTY_SRC, 'build', 'Release', 'pty.node');
+    if (fs.existsSync(freshBuild)) {
+      fs.mkdirSync(path.join(PTY_DST, 'build', 'Release'), { recursive: true });
+      fs.cpSync(freshBuild, path.join(PTY_DST, 'build', 'Release', 'pty.node'));
+      console.log('  node-pty: rebuilt and copied successfully');
+      binaryCopied = true;
     }
-    fs.cpSync(path.join(NPTY_SRC, 'prebuilds'), path.join(NPTY_DIST, 'prebuilds'), { recursive: true, force: true });
+  } catch (e) {
+    console.error('  node-pty: rebuild failed. Install build-essential and python3, then try again.');
+    console.error('  Error:', e.stderr?.toString() || e.message);
+    process.exit(1);
   }
-  console.log('  node-pty: Linux x64+arm64 + macOS x64+arm64 + Windows x64+arm64');
+}
+
+if (!binaryCopied) {
+  console.error('  node-pty: could not obtain pty.node');
+  process.exit(1);
 }
 
 console.log('Node dist built: run node dist-node/index.js -s <hub-url> -t <token> [-p <port>]');
