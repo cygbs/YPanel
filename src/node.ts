@@ -210,8 +210,8 @@ app.post('/api/instances/:id/start', (req, res) => {
   managedProcesses.set(id, entry);
   console.log(`[node] process #${id} added to map, total: ${managedProcesses.size}`);
 
-  pty.write(`cd "${inst.folder}"\n`);
-  pty.write(`${inst.command}\n`);
+  pty.write(`cd "${inst.folder}"\r`);
+  pty.write(`${inst.command}\r`);
 
   res.json({ status: 'started', instanceId: id });
 });
@@ -227,7 +227,7 @@ app.post('/api/instances/:id/stop', (req, res) => {
   if (stopCmd === '^C') {
     mp.pty.write('\x03');
   } else {
-    mp.pty.write(stopCmd + '\n');
+    mp.pty.write(stopCmd + '\r');
   }
   // 3 秒后强制终止
   setTimeout(() => {
@@ -331,10 +331,10 @@ wss.on('connection', (ws: WebSocket, req) => {
 
     // 先 cd 到实例目录，再执行启动命令（如果有）
     if (inst?.folder) {
-      shell.write(`cd "${inst.folder}"\n`);
+      shell.write(`cd "${inst.folder}"\r`);
     }
     if (inst?.command) {
-      shell.write(`${inst.command}\n`);
+      shell.write(`${inst.command}\r`);
     }
 
     ws.on('message', (raw: Buffer | ArrayBuffer | Buffer[]) => {
@@ -469,8 +469,8 @@ function autoStartInstances(): void {
       });
 
       managedProcesses.set(inst.id, entry);
-      pty.write(`cd "${inst.folder}"\n`);
-      pty.write(`${inst.command}\n`);
+      pty.write(`cd "${inst.folder}"\r`);
+      pty.write(`${inst.command}\r`);
       console.log(`  auto-start: #${inst.id} ${inst.name}`);
     }
   }
