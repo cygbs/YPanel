@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>YPanel</title>
-  <link rel="stylesheet" href="client.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
@@ -183,6 +182,11 @@
       padding: 10px;
       background: #161633;
       border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .instance-card:hover {
+      background: #1e1e42;
     }
     .inst-icon-wrap {
       position: relative;
@@ -474,6 +478,9 @@
       flex-direction: column;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
+    .dialog-sm {
+      width: 400px;
+    }
     .dialog-title {
       padding: 16px 20px 0;
       font-size: 16px;
@@ -637,18 +644,11 @@
     .btn-danger:hover {
       background: #ff6e6e;
     }
-    .dialog-sm .dialog-title {
-      font-size: 15px;
-    }
     .delete-warning {
       font-size: 13px;
       color: #aaa;
       line-height: 1.6;
       margin: 0;
-    }
-    .instance-card.selected {
-      background: #1e1e4a;
-      box-shadow: 0 0 0 1px #6272a4;
     }
     .fm-btn-danger {
       color: #ff6e6e;
@@ -726,6 +726,6 @@
 </head>
 <body>
   <div id="app"></div>
-  <script src="client.js"></script>
+  <script type="module" src="/src/client.ts"></script>
 </body>
 </html>

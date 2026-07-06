@@ -4,12 +4,11 @@
   "description": "YPanel - Web Minecraft server manager",
   "private": true,
   "scripts": {
-    "build:client": "node scripts/build-client.mjs --prod",
-    "build:client:dev": "node scripts/build-client.mjs",
+    "build:client": "vite build",
     "build:hub": "esbuild src/hub.ts --bundle --platform=node --outfile=dist/index.js --minify",
     "build:node": "esbuild src/node.ts --bundle --platform=node --outfile=dist-node/index.js --external:zigpty --minify",
     "build": "npm run build:client && npm run build:hub && npm run build:node && node scripts/copy-dist.js",
-    "start": "npm run build:client:dev && tsx src/hub.ts"
+    "start": "vite build && tsx src/hub.ts"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -23,9 +22,11 @@
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.0",
     "@types/ws": "^8.5.10",
+    "@vitejs/plugin-vue": "^6.0.7",
     "esbuild": "^0.28.1",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vite": "^8.1.3"
   },
   "allowScripts": {
     "esbuild@0.28.1": true

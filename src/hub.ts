@@ -25,7 +25,10 @@ app.use(express.json());
 const ROOT_DIR = process.argv[1]?.endsWith('.ts')
   ? path.resolve(__dirname, '..')
   : __dirname;
-app.use(express.static(path.join(ROOT_DIR, 'public')));
+const PUBLIC_DIR = process.argv[1]?.endsWith('.ts')
+  ? path.resolve(ROOT_DIR, 'dist', 'public')
+  : path.join(ROOT_DIR, 'public');
+app.use(express.static(PUBLIC_DIR));
 
 // ── 数据存储 ──
 const DATA_DIR = path.join(ROOT_DIR, 'data');
