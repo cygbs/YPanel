@@ -40,7 +40,7 @@
   <!-- ===== 主界面 ===== -->
   <div v-else class="app-layout">
     <!-- 标签栏 -->
-    <div class="tab-bar">
+    <div v-show="activeNodeId !== null" class="tab-bar">
       <div class="tabs-scroll">
         <div
           v-for="tab in tabs"
@@ -385,7 +385,7 @@
               v-model="settings.defaultShell"
               type="text"
               class="input mono"
-              placeholder="/usr/bin/bash"
+              :placeholder="detectedShell"
             />
           </label>
         </div>
@@ -785,7 +785,8 @@ export default defineComponent({
     const showIconPicker = ref(false);
     const showSettings = ref(false);
     const savingSettings = ref(false);
-    const settings = reactive({ defaultShell: '/usr/bin/bash' });
+    const settings = reactive({ defaultShell: '' });
+    const detectedShell = ref('/bin/sh');
     const showDeleteConfirm = ref(false);
     const saving = ref(false);
 
@@ -1018,7 +1019,8 @@ export default defineComponent({
         const res = await apiFetch(prefix + '/settings');
         if (res.ok) {
           const data = await res.json();
-          settings.defaultShell = data.defaultShell || '/usr/bin/bash';
+          settings.defaultShell = data.defaultShell || '';
+          detectedShell.value = data.detectedShell || '/bin/sh';
         }
       } catch { /* ignore */ }
     }
@@ -1100,7 +1102,7 @@ export default defineComponent({
       openNewInstance, closeNewDialog, selectIcon,
       createInstance, startInstance, stopInstance,
       openTerminal, openEditInstance,
-      openSettings, closeSettings, saveSettings,
+      openSettings, closeSettings, saveSettings, detectedShell,
       openDeleteConfirm, confirmDelete, cancelDelete,
       AVAILABLE_ICONS,
     };
