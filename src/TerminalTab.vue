@@ -1,3 +1,8 @@
+<template>
+  <div ref="terminalRef" class="terminal-view"></div>
+</template>
+
+<script lang="ts">
 import { defineComponent, ref, onMounted, onUnmounted, watch, type PropType } from 'vue';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
@@ -193,5 +198,5 @@ export default defineComponent({
 
     return { terminalRef };
   },
-  template: '<div ref="terminalRef" class="terminal-view"></div>',
 });
+</script>

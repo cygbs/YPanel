@@ -1,5 +1,425 @@
+<template>
+  <!-- ===== 加载中 ===== -->
+  <div v-if="authState === 'loading'" class="auth-screen">
+    <div class="auth-box">
+      <div class="auth-loading">正在加载…</div>
+    </div>
+  </div>
+
+  <!-- ===== 登录页 ===== -->
+  <div v-else-if="authState === 'login'" class="auth-screen">
+    <div class="auth-box">
+      <div class="auth-title">YPanel</div>
+      <div class="auth-subtitle">请登录</div>
+      <div class="auth-field">
+        <input v-model="loginPassword" type="password" class="input" placeholder="密码" @keyup.enter="doLogin" />
+      </div>
+      <div v-if="loginError" class="auth-error">{{ loginError }}</div>
+      <button class="btn btn-primary auth-btn" @click="doLogin">登录</button>
+    </div>
+  </div>
+
+  <!-- ===== 修改默认密码 ===== -->
+  <div v-else-if="authState === 'change-password'" class="auth-screen">
+    <div class="auth-box">
+      <div class="auth-title">YPanel</div>
+      <div class="auth-subtitle">请修改默认密码</div>
+      <div class="auth-field">
+        <input v-model="changeNewPassword" type="password" class="input" placeholder="新密码" @keyup.enter="doChangePassword" />
+      </div>
+      <div class="auth-field">
+        <input v-model="changeConfirmPassword" type="password" class="input" placeholder="重复新密码" @keyup.enter="doChangePassword" />
+      </div>
+      <div v-if="changeError" class="auth-error">{{ changeError }}</div>
+      <button class="btn btn-primary auth-btn" :disabled="changingPassword" @click="doChangePassword">
+        {{ changingPassword ? '保存中…' : '保存' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== 主界面 ===== -->
+  <div v-else class="app-layout">
+    <!-- 标签栏 -->
+    <div class="tab-bar">
+      <div class="tabs-scroll">
+        <div
+          v-for="tab in tabs"
+          :key="tab.id"
+          class="tab"
+          :class="{ active: tab.id === activeId }"
+          @click="switchTab(tab.id)"
+          @mousedown.middle="closeTab(tab.id)"
+        >
+          <span class="tab-label">{{ tab.title }}</span>
+          <span
+            v-if="tab.type === 'terminal'"
+            class="tab-close"
+            @click.stop="closeTab(tab.id)"
+            title="关闭"
+          >&times;</span>
+        </div>
+      </div>
+      <div class="tab-add" @click="addTerminalTab()" title="新标签页">+</div>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="content-area">
+      <!-- 主页 -->
+      <div v-show="activeId === 0" class="page-home">
+        <!-- 快捷操作栏 -->
+        <div class="quick-actions">
+          <template v-if="activeNodeId !== null">
+            <button @click="openNewInstance">新建实例</button>
+            <button>打开文件夹…</button>
+            <button @click="openSettings">设置</button>
+            <button @click="leaveNode" class="qa-back">返回节点列表</button>
+          </template>
+          <template v-else>
+            <button @click="openNodeDialog">新增节点…</button>
+          </template>
+          <button>帮助</button>
+        </div>
+
+        <!-- 主体区域 -->
+        <div class="home-body">
+          <!-- 节点列表模式 -->
+          <template v-if="activeNodeId === null">
+            <div class="instance-list">
+              <div
+                v-for="node in nodes"
+                :key="node.id"
+                class="instance-card"
+                :class="{ selected: node.id === selectedNodeId }"
+                @click="selectNode(node.id)"
+              >
+                <div class="inst-icon-wrap">
+                  <img class="inst-icon" :src="'/assets/instances/' + (node.icon || 'gear.svg')" :alt="node.name" />
+                  <span class="status-dot" :class="node.connected ? 'running' : 'offline'"></span>
+                </div>
+                <span class="inst-name">{{ node.name }}</span>
+              </div>
+              <div v-if="nodes.length === 0" class="no-instances-hint">
+                暂无节点，点击「新增节点…」创建
+              </div>
+            </div>
+            <div class="function-menu">
+              <template v-if="selectedNodeForMenu">
+                <div class="fm-icon" @click="selectNode(null)">
+                  <img :src="'/assets/instances/' + (selectedNodeForMenu.icon || 'gear.svg')" />
+                </div>
+                <div class="fm-name">{{ selectedNodeForMenu.name }}</div>
+                <div class="fm-actions">
+                  <button class="fm-btn" :disabled="!selectedNodeForMenu.connected"
+                    @click="switchToNode(selectedNodeForMenu.id)">切换</button>
+                  <button class="fm-btn"
+                    @click="openEditNode">编辑</button>
+                  <button class="fm-btn fm-btn-danger"
+                    @click="deleteNode(selectedNodeForMenu.id)">删除</button>
+                </div>
+              </template>
+              <div v-else class="fm-empty">选择一个节点</div>
+            </div>
+          </template>
+
+          <!-- 实例模式 -->
+          <template v-else>
+            <div class="instance-list">
+              <div
+                v-for="inst in instances"
+                :key="inst.id"
+                class="instance-card"
+                :class="{ selected: inst.id === selectedInstance?.id }"
+                @click="selectInstance(inst.id)"
+              >
+                <div class="inst-icon-wrap">
+                  <img class="inst-icon" :src="'/assets/instances/' + (inst.icon || 'grass.svg')" :alt="inst.name" />
+                  <span v-if="runningStates[inst.id]" class="status-dot" :class="runningStates[inst.id]"></span>
+                </div>
+                <span class="inst-name">{{ inst.name }} #{{ inst.id }}</span>
+              </div>
+              <div v-if="instances.length === 0" class="no-instances-hint">
+                该节点暂无实例，点击「新建实例」添加
+              </div>
+            </div>
+            <div class="function-menu">
+              <template v-if="selectedInstance">
+                <div class="fm-icon" @click="selectInstance(null)">
+                  <img :src="'/assets/instances/' + (selectedInstance.icon || 'grass.svg')" :alt="selectedInstance.name" />
+                </div>
+                <div class="fm-name">{{ selectedInstance.name }}</div>
+                <div class="fm-actions">
+                  <button class="fm-btn" @click="startInstance">启动</button>
+                  <button class="fm-btn" @click="stopInstance">停止</button>
+                  <button class="fm-btn" @click="openTerminal">打开终端</button>
+                  <button class="fm-btn" @click="openEditInstance">编辑</button>
+                  <button class="fm-btn fm-btn-danger" @click="openDeleteConfirm">删除实例</button>
+                </div>
+              </template>
+              <div v-else class="fm-empty">选择一个实例</div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 终端标签页 -->
+      <div
+        v-for="tab in terminalTabs"
+        v-show="tab.id === activeId"
+        :key="tab.id"
+        class="terminal-wrapper"
+      >
+        <TerminalTab
+          :ref="(el: any) => setTabRef(tab.id, el)"
+          :tab-id="tab.id"
+          :is-active="tab.id === activeId"
+          :init-commands="tab.initCommands || []"
+          :instance-id="tab.instanceId ?? null"
+          :node-id="tab.nodeId ?? null"
+        />
+      </div>
+    </div>
+
+    <!-- ===== 新增节点对话框（仅名称+生成） ===== -->
+    <div v-if="showNodeDialog" class="dialog-overlay" @click.self="closeNodeDialog">
+      <div class="dialog dialog-sm">
+        <div class="dialog-title">新增节点</div>
+        <div class="dialog-body">
+          <div class="node-gen-row">
+            <input
+              v-model="newNodeName"
+              type="text"
+              class="input"
+              placeholder="节点名称（可选）"
+              @keyup.enter="generateNodeToken"
+            />
+            <button class="btn btn-primary" :disabled="generatingNode" @click="generateNodeToken">
+              {{ generatingNode ? '生成中…' : '生成 Token' }}
+            </button>
+          </div>
+          <div v-if="nodeError" class="field-error">{{ nodeError }}</div>
+          <!-- 待处理的 Token -->
+          <div v-if="pendingTokens.length > 0" class="node-list-title" style="margin-top:12px">等待连接的 Token</div>
+          <div v-for="pt in pendingTokens" :key="pt.token" class="node-item pending">
+            <div class="node-info">
+              <div class="node-status-dot pending-dot"></div>
+              <div class="node-details">
+                <span class="node-name">{{ pt.name }}</span>
+                <span class="node-seen">等待连接…</span>
+              </div>
+            </div>
+            <div class="node-actions">
+              <button class="btn btn-danger btn-sm" @click="cancelPendingToken(pt.token)">取消</button>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" @click="closeNodeDialog">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Token 命令对话框 ===== -->
+    <div v-if="showGeneratedToken" class="dialog-overlay" @click.self="showGeneratedToken = false">
+      <div class="dialog">
+        <div class="dialog-title">新节点「{{ generatedNodeName }}」</div>
+        <div class="dialog-body">
+          <div class="node-token-label" style="margin-bottom:8px">在目标机器上运行以下命令：</div>
+          <div class="token-cmd-box">
+            <code class="token-cmd-text">node index.js -s ws://{{ locationHost }}/link -t {{ generatedToken }} -p 6701</code>
+          </div>
+          <div class="token-cmd-note">节点连接后此窗口将自动关闭。</div>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-primary" @click="copyToken">复制命令</button>
+          <button class="btn btn-secondary" @click="showGeneratedToken = false">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 编辑节点对话框 ===== -->
+    <div v-if="showEditNodeDialog" class="dialog-overlay" @click.self="closeEditNode">
+      <div class="dialog">
+        <div class="dialog-title">编辑节点</div>
+        <div class="dialog-body">
+          <label class="field">
+            <span class="field-label">节点名称</span>
+            <input
+              v-model="editNodeData.name"
+              type="text"
+              class="input"
+              placeholder="节点名称"
+            />
+          </label>
+          <label class="field">
+            <span class="field-label">节点图标</span>
+            <div class="icon-selector" @click="showIconPicker = !showIconPicker">
+              <img class="icon-preview" :src="'/assets/instances/' + editNodeData.icon" :alt="editNodeData.icon" />
+              <span class="icon-name">{{ editNodeData.icon }}</span>
+            </div>
+            <div v-if="showIconPicker" class="icon-grid">
+              <div
+                v-for="icon in AVAILABLE_ICONS"
+                :key="icon"
+                class="icon-option"
+                :class="{ selected: icon === editNodeData.icon }"
+                @click="editNodeData.icon = icon"
+              >
+                <img :src="'/assets/instances/' + icon" :alt="icon" />
+              </div>
+            </div>
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" @click="closeEditNode">取消</button>
+          <button class="btn btn-primary" :disabled="savingNode" @click="saveEditNode">
+            {{ savingNode ? '保存中…' : '保存' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 新建/编辑实例对话框 ===== -->
+    <div v-if="showNewDialog" class="dialog-overlay" @click.self="closeNewDialog">
+      <div class="dialog">
+        <div class="dialog-title">{{ isEditing ? '编辑实例' : '新建实例' }}</div>
+        <div class="dialog-body">
+          <label class="field">
+            <span class="field-label">实例名称</span>
+            <input
+              v-model="newData.name"
+              type="text"
+              class="input"
+              :class="{ invalid: errors.name }"
+              placeholder="什么名字比较好呢？"
+            />
+            <span v-if="errors.name" class="field-error">请填写这个。</span>
+          </label>
+          <label class="field">
+            <span class="field-label">实例UUID</span>
+            <input
+              :value="newData.uuid"
+              type="text"
+              class="input mono"
+              readonly
+            />
+          </label>
+          <label class="field">
+            <span class="field-label">实例图标</span>
+            <div class="icon-selector" @click="showIconPicker = !showIconPicker">
+              <img class="icon-preview" :src="'/assets/instances/' + newData.icon" :alt="newData.icon" />
+              <span class="icon-name">{{ newData.icon }}</span>
+            </div>
+            <div v-if="showIconPicker" class="icon-grid">
+              <div
+                v-for="icon in AVAILABLE_ICONS"
+                :key="icon"
+                class="icon-option"
+                :class="{ selected: icon === newData.icon }"
+                @click="selectIcon(icon)"
+              >
+                <img :src="'/assets/instances/' + icon" :alt="icon" />
+              </div>
+            </div>
+          </label>
+          <label class="field">
+            <span class="field-label">
+              实例启动命令
+              <span v-if="isEditingLocked" class="field-hint">（停止实例后方可修改）</span>
+            </span>
+            <input
+              v-model="newData.command"
+              type="text"
+              class="input mono"
+              :class="{ invalid: errors.command }"
+              :disabled="isEditingLocked"
+              placeholder="java -jar xxx.jar"
+            />
+            <span v-if="errors.command" class="field-error">请填写这个。</span>
+          </label>
+          <label class="field">
+            <span class="field-label">
+              实例文件夹
+              <span v-if="isEditingLocked" class="field-hint">（停止实例后方可修改）</span>
+            </span>
+            <input
+              v-model="newData.folder"
+              type="text"
+              class="input mono"
+              :class="{ invalid: errors.folder }"
+              :disabled="isEditingLocked"
+              placeholder="path/to/your/folder"
+            />
+            <span v-if="errors.folder" class="field-error">请填写这个。</span>
+          </label>
+          <label class="field">
+            <span class="field-label">实例停止方法</span>
+            <input
+              v-model="newData.stopCommand"
+              type="text"
+              class="input mono"
+              placeholder="^C"
+            />
+          </label>
+          <label class="field field-row">
+            <input type="checkbox" class="checkbox" v-model="newData.autoStart" />
+            <span class="field-label">自动启动？</span>
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" @click="closeNewDialog">取消</button>
+          <button class="btn btn-primary" :disabled="saving" @click="createInstance">
+            {{ saving ? '保存中…' : isEditing ? '保存' : '创建' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 设置对话框 ===== -->
+    <div v-if="showSettings" class="dialog-overlay" @click.self="closeSettings">
+      <div class="dialog">
+        <div class="dialog-title">设置 — {{ activeNode?.name || '节点' }}</div>
+        <div class="dialog-body">
+          <label class="field">
+            <span class="field-label">默认Shell</span>
+            <input
+              v-model="settings.defaultShell"
+              type="text"
+              class="input mono"
+              placeholder="/usr/bin/bash"
+            />
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" @click="closeSettings">取消</button>
+          <button class="btn btn-primary" :disabled="savingSettings" @click="saveSettings">
+            {{ savingSettings ? '保存中…' : '保存' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 删除确认对话框 ===== -->
+    <div v-if="showDeleteConfirm" class="dialog-overlay" @click.self="cancelDelete">
+      <div class="dialog dialog-sm">
+        <div class="dialog-title">真的要删除该实例吗？</div>
+        <div class="dialog-body">
+          <p class="delete-warning">
+            如果该实例处于运行状态，则会强制中止并删除该实例。
+            删除实例后面板并不会清除其文件夹中的数据，如果需要删除，请手动操作。
+          </p>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" @click="cancelDelete">取消</button>
+          <button class="btn btn-danger" @click="confirmDelete">确认删除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
 import { defineComponent, reactive, ref, computed, watch } from 'vue';
-import TerminalTab from './TerminalTab';
+import TerminalTab from './TerminalTab.vue';
 
 /** 带认证的 fetch */
 function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -32,7 +452,6 @@ const AVAILABLE_ICONS = [
 ];
 
 function generateUUID(): string {
-  // Math.random 模拟 UUID v4，各浏览器/HTTP 都兼容
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
@@ -154,18 +573,14 @@ export default defineComponent({
     }
 
     function addTerminalTab(title?: string, initCommands?: string[], instanceId?: number, nodeId?: number): void {
-      // 不带参数 → 在节点上创建普通 Shell 终端
       if (instanceId === undefined && nodeId === undefined) {
         if (activeNodeId.value !== null) {
           nodeId = activeNodeId.value;
-          // instanceId 留 undefined，对应节点的普通 Shell
         } else {
-          // 不在任何节点中，无法创建终端
           return;
         }
       }
       const id = nextTabId++;
-      // 显式保留 undefined 给 instanceId，组件会据此构建不带 instanceId 的 WS URL
       tabs.push({
         id, title: title || `终端 ${id}`,
         type: 'terminal', initCommands,
@@ -201,13 +616,11 @@ export default defineComponent({
     const showGeneratedToken = ref(false);
     const nodeError = ref('');
 
-    /** API 前缀：当在节点中时指向代理路径 */
     function apiPrefix(): string {
       const nid = activeNodeId.value;
       return nid !== null ? `/api/node/${nid}` : '';
     }
 
-    /** 加载节点列表 */
     async function loadNodes(): Promise<void> {
       try {
         const res = await apiFetch('/api/nodes');
@@ -215,7 +628,6 @@ export default defineComponent({
           const data = await res.json();
           nodes.value = data.nodes || [];
           pendingTokens.value = data.pendingTokens || [];
-          // 如果当前激活的节点离线了，清空选择
           if (activeNodeId.value !== null && !nodes.value.find(n => n.id === activeNodeId.value)) {
             activeNodeId.value = null;
           }
@@ -223,7 +635,6 @@ export default defineComponent({
       } catch { /* ignore */ }
     }
 
-    /** 选中的节点（在节点列表中高亮） */
     const selectedNodeId = ref<number | null>(null);
     const selectedNodeForMenu = computed(() =>
       nodes.value.find(n => n.id === selectedNodeId.value) ?? null
@@ -232,7 +643,6 @@ export default defineComponent({
       selectedNodeId.value = id;
     }
 
-    /** 打开节点列表对话框 */
     function openNodeDialog(): void {
       showNodeDialog.value = true;
       newNodeName.value = '';
@@ -247,7 +657,6 @@ export default defineComponent({
       showNodeDialog.value = false;
     }
 
-    /** 生成新节点 Token */
     async function generateNodeToken(): Promise<void> {
       generatingNode.value = true;
       nodeError.value = '';
@@ -275,7 +684,6 @@ export default defineComponent({
       }
     }
 
-    /** 删除节点 */
     async function deleteNode(id: number): Promise<void> {
       if (!confirm('确定删除此节点？')) return;
       try {
@@ -287,13 +695,11 @@ export default defineComponent({
       } catch { /* ignore */ }
     }
 
-    /** 复制到剪贴板 */
     function copyToken(): void {
       const cmd = `node index.js -s ws://${window.location.host}/link -t ${generatedToken.value} -p 6701`;
       navigator.clipboard.writeText(cmd).catch(() => {});
     }
 
-    /** 当 pending token 被消耗（节点连接）时自动关闭 token 对话框 */
     watch(pendingTokens, (list) => {
       if (showGeneratedToken.value && generatedToken.value) {
         const stillPending = list.some(p => p.token === generatedToken.value);
@@ -303,7 +709,6 @@ export default defineComponent({
       }
     });
 
-    /** 取消 pending token */
     async function cancelPendingToken(token: string): Promise<void> {
       try {
         await apiFetch(`/api/nodes/pending/${token}`, { method: 'DELETE' });
@@ -311,15 +716,12 @@ export default defineComponent({
       } catch { /* ignore */ }
     }
 
-    /** 切换到节点 */
     function switchToNode(id: number): void {
       activeNodeId.value = id;
       showNodeDialog.value = false;
-      // 重新加载实例列表
       loadInstances();
     }
 
-    /** 返回节点列表 */
     function leaveNode(): void {
       activeNodeId.value = null;
       instances.value = [];
@@ -454,7 +856,6 @@ export default defineComponent({
       selectedId.value = id;
     }
 
-    /** 加载实例列表（通过 hub 代理） */
     async function loadInstances(): Promise<void> {
       const prefix = apiPrefix();
       if (!prefix) return;
@@ -472,7 +873,6 @@ export default defineComponent({
       } catch { /* ignore */ }
     }
 
-    /** 轮询实例状态 */
     async function pollStatus(): Promise<void> {
       const prefix = apiPrefix();
       if (!prefix) return;
@@ -570,7 +970,6 @@ export default defineComponent({
       const prefix = apiPrefix();
       try {
         if (isEditing.value && editingId.value !== null) {
-          // 编辑
           const res = await apiFetch(prefix + '/instances/' + editingId.value, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -587,7 +986,6 @@ export default defineComponent({
             closeNewDialog();
           }
         } else {
-          // 新建
           const res = await apiFetch(prefix + '/instances', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -673,7 +1071,6 @@ export default defineComponent({
     const nodesTimer = setInterval(() => loadNodes(), 5000);
     const statusTimer = setInterval(() => pollStatus(), 10000);
 
-    // 在模板中暴露 location.host（Vue 模板不自动暴露全局 location）
     const locationHost = window.location.host;
 
     return {
@@ -708,422 +1105,5 @@ export default defineComponent({
       AVAILABLE_ICONS,
     };
   },
-  template: `
-    <!-- ===== 加载中 ===== -->
-    <div v-if="authState === 'loading'" class="auth-screen">
-      <div class="auth-box">
-        <div class="auth-loading">正在加载…</div>
-      </div>
-    </div>
-
-    <!-- ===== 登录页 ===== -->
-    <div v-else-if="authState === 'login'" class="auth-screen">
-      <div class="auth-box">
-        <div class="auth-title">YPanel</div>
-        <div class="auth-subtitle">请登录</div>
-        <div class="auth-field">
-          <input v-model="loginPassword" type="password" class="input" placeholder="密码" @keyup.enter="doLogin" />
-        </div>
-        <div v-if="loginError" class="auth-error">{{ loginError }}</div>
-        <button class="btn btn-primary auth-btn" @click="doLogin">登录</button>
-      </div>
-    </div>
-
-    <!-- ===== 修改默认密码 ===== -->
-    <div v-else-if="authState === 'change-password'" class="auth-screen">
-      <div class="auth-box">
-        <div class="auth-title">YPanel</div>
-        <div class="auth-subtitle">请修改默认密码</div>
-        <div class="auth-field">
-          <input v-model="changeNewPassword" type="password" class="input" placeholder="新密码" @keyup.enter="doChangePassword" />
-        </div>
-        <div class="auth-field">
-          <input v-model="changeConfirmPassword" type="password" class="input" placeholder="重复新密码" @keyup.enter="doChangePassword" />
-        </div>
-        <div v-if="changeError" class="auth-error">{{ changeError }}</div>
-        <button class="btn btn-primary auth-btn" :disabled="changingPassword" @click="doChangePassword">
-          {{ changingPassword ? '保存中…' : '保存' }}
-        </button>
-      </div>
-    </div>
-
-    <!-- ===== 主界面 ===== -->
-    <div v-else class="app-layout">
-      <!-- 标签栏 -->
-      <div class="tab-bar">
-        <div class="tabs-scroll">
-          <div
-            v-for="tab in tabs"
-            :key="tab.id"
-            class="tab"
-            :class="{ active: tab.id === activeId }"
-            @click="switchTab(tab.id)"
-            @mousedown.middle="closeTab(tab.id)"
-          >
-            <span class="tab-label">{{ tab.title }}</span>
-            <span
-              v-if="tab.type === 'terminal'"
-              class="tab-close"
-              @click.stop="closeTab(tab.id)"
-              title="关闭"
-            >&times;</span>
-          </div>
-        </div>
-        <div class="tab-add" @click="addTerminalTab()" title="新标签页">+</div>
-      </div>
-
-      <!-- 内容区 -->
-      <div class="content-area">
-        <!-- 主页 -->
-        <div v-show="activeId === 0" class="page-home">
-          <!-- 快捷操作栏 -->
-          <div class="quick-actions">
-            <template v-if="activeNodeId !== null">
-              <button @click="openNewInstance">新建实例</button>
-              <button>打开文件夹…</button>
-              <button @click="openSettings">设置</button>
-              <button @click="leaveNode" class="qa-back">返回节点列表</button>
-            </template>
-            <template v-else>
-              <button @click="openNodeDialog">新增节点…</button>
-            </template>
-            <button>帮助</button>
-          </div>
-
-          <!-- 主体区域 -->
-          <div class="home-body">
-            <!-- 节点列表模式 -->
-            <template v-if="activeNodeId === null">
-              <div class="instance-list">
-                <div
-                  v-for="node in nodes"
-                  :key="node.id"
-                  class="instance-card"
-                  :class="{ selected: node.id === selectedNodeId }"
-                  @click="selectNode(node.id)"
-                >
-                  <div class="inst-icon-wrap">
-                    <img class="inst-icon" :src="'/assets/instances/' + (node.icon || 'gear.svg')" :alt="node.name" />
-                    <span class="status-dot" :class="node.connected ? 'running' : 'offline'"></span>
-                  </div>
-                  <span class="inst-name">{{ node.name }}</span>
-                </div>
-                <div v-if="nodes.length === 0" class="no-instances-hint">
-                  暂无节点，点击「新增节点…」创建
-                </div>
-              </div>
-              <div class="function-menu">
-                <template v-if="selectedNodeForMenu">
-                  <div class="fm-icon" @click="selectNode(null)">
-                    <img :src="'/assets/instances/' + (selectedNodeForMenu.icon || 'gear.svg')" />
-                  </div>
-                  <div class="fm-name">{{ selectedNodeForMenu.name }}</div>
-                  <div class="fm-actions">
-                    <button class="fm-btn" :disabled="!selectedNodeForMenu.connected"
-                      @click="switchToNode(selectedNodeForMenu.id)">切换</button>
-                    <button class="fm-btn"
-                      @click="openEditNode">编辑</button>
-                    <button class="fm-btn fm-btn-danger"
-                      @click="deleteNode(selectedNodeForMenu.id)">删除</button>
-                  </div>
-                </template>
-                <div v-else class="fm-empty">选择一个节点</div>
-              </div>
-            </template>
-
-            <!-- 实例模式 -->
-            <template v-else>
-              <div class="instance-list">
-                <div
-                  v-for="inst in instances"
-                  :key="inst.id"
-                  class="instance-card"
-                  :class="{ selected: inst.id === selectedInstance?.id }"
-                  @click="selectInstance(inst.id)"
-                >
-                  <div class="inst-icon-wrap">
-                    <img class="inst-icon" :src="'/assets/instances/' + (inst.icon || 'grass.svg')" :alt="inst.name" />
-                    <span v-if="runningStates[inst.id]" class="status-dot" :class="runningStates[inst.id]"></span>
-                  </div>
-                  <span class="inst-name">{{ inst.name }} #{{ inst.id }}</span>
-                </div>
-                <div v-if="instances.length === 0" class="no-instances-hint">
-                  该节点暂无实例，点击「新建实例」添加
-                </div>
-              </div>
-              <div class="function-menu">
-                <template v-if="selectedInstance">
-                  <div class="fm-icon" @click="selectInstance(null)">
-                    <img :src="'/assets/instances/' + (selectedInstance.icon || 'grass.svg')" :alt="selectedInstance.name" />
-                  </div>
-                  <div class="fm-name">{{ selectedInstance.name }}</div>
-                  <div class="fm-actions">
-                    <button class="fm-btn" @click="startInstance">启动</button>
-                    <button class="fm-btn" @click="stopInstance">停止</button>
-                    <button class="fm-btn" @click="openTerminal">打开终端</button>
-                    <button class="fm-btn" @click="openEditInstance">编辑</button>
-                    <button class="fm-btn fm-btn-danger" @click="openDeleteConfirm">删除实例</button>
-                  </div>
-                </template>
-                <div v-else class="fm-empty">选择一个实例</div>
-              </div>
-            </template>
-          </div>
-        </div>
-
-        <!-- 终端标签页 -->
-        <div
-          v-for="tab in terminalTabs"
-          v-show="tab.id === activeId"
-          :key="tab.id"
-          class="terminal-wrapper"
-        >
-          <TerminalTab
-            :ref="(el) => setTabRef(tab.id, el)"
-            :tab-id="tab.id"
-            :is-active="tab.id === activeId"
-            :init-commands="tab.initCommands || []"
-            :instance-id="tab.instanceId ?? null"
-            :node-id="tab.nodeId ?? null"
-          />
-        </div>
-      </div>
-
-      <!-- ===== 新增节点对话框（仅名称+生成） ===== -->
-      <div v-if="showNodeDialog" class="dialog-overlay" @click.self="closeNodeDialog">
-        <div class="dialog dialog-sm">
-          <div class="dialog-title">新增节点</div>
-          <div class="dialog-body">
-            <div class="node-gen-row">
-              <input
-                v-model="newNodeName"
-                type="text"
-                class="input"
-                placeholder="节点名称（可选）"
-                @keyup.enter="generateNodeToken"
-              />
-              <button class="btn btn-primary" :disabled="generatingNode" @click="generateNodeToken">
-                {{ generatingNode ? '生成中…' : '生成 Token' }}
-              </button>
-            </div>
-            <div v-if="nodeError" class="field-error">{{ nodeError }}</div>
-            <!-- 待处理的 Token -->
-            <div v-if="pendingTokens.length > 0" class="node-list-title" style="margin-top:12px">等待连接的 Token</div>
-            <div v-for="pt in pendingTokens" :key="pt.token" class="node-item pending">
-              <div class="node-info">
-                <div class="node-status-dot pending-dot"></div>
-                <div class="node-details">
-                  <span class="node-name">{{ pt.name }}</span>
-                  <span class="node-seen">等待连接…</span>
-                </div>
-              </div>
-              <div class="node-actions">
-                <button class="btn btn-danger btn-sm" @click="cancelPendingToken(pt.token)">取消</button>
-              </div>
-            </div>
-          </div>
-          <div class="dialog-actions">
-            <button class="btn btn-secondary" @click="closeNodeDialog">关闭</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== Token 命令对话框 ===== -->
-      <div v-if="showGeneratedToken" class="dialog-overlay" @click.self="showGeneratedToken = false">
-        <div class="dialog">
-          <div class="dialog-title">新节点「{{ generatedNodeName }}」</div>
-          <div class="dialog-body">
-            <div class="node-token-label" style="margin-bottom:8px">在目标机器上运行以下命令：</div>
-            <div class="token-cmd-box">
-              <code class="token-cmd-text">node index.js -s ws://{{ locationHost }}/link -t {{ generatedToken }} -p 6701</code>
-            </div>
-            <div class="token-cmd-note">节点连接后此窗口将自动关闭。</div>
-          </div>
-          <div class="dialog-actions">
-            <button class="btn btn-primary" @click="copyToken">复制命令</button>
-            <button class="btn btn-secondary" @click="showGeneratedToken = false">关闭</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== 编辑节点对话框 ===== -->
-      <div v-if="showEditNodeDialog" class="dialog-overlay" @click.self="closeEditNode">
-        <div class="dialog">
-          <div class="dialog-title">编辑节点</div>
-          <div class="dialog-body">
-            <label class="field">
-              <span class="field-label">节点名称</span>
-              <input
-                v-model="editNodeData.name"
-                type="text"
-                class="input"
-                placeholder="节点名称"
-              />
-            </label>
-            <label class="field">
-              <span class="field-label">节点图标</span>
-              <div class="icon-selector" @click="showIconPicker = !showIconPicker">
-                <img class="icon-preview" :src="'/assets/instances/' + editNodeData.icon" :alt="editNodeData.icon" />
-                <span class="icon-name">{{ editNodeData.icon }}</span>
-              </div>
-              <div v-if="showIconPicker" class="icon-grid">
-                <div
-                  v-for="icon in AVAILABLE_ICONS"
-                  :key="icon"
-                  class="icon-option"
-                  :class="{ selected: icon === editNodeData.icon }"
-                  @click="editNodeData.icon = icon"
-                >
-                  <img :src="'/assets/instances/' + icon" :alt="icon" />
-                </div>
-              </div>
-            </label>
-          </div>
-          <div class="dialog-actions">
-            <button class="btn btn-secondary" @click="closeEditNode">取消</button>
-            <button class="btn btn-primary" :disabled="savingNode" @click="saveEditNode">
-              {{ savingNode ? '保存中…' : '保存' }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== 新建/编辑实例对话框 ===== -->
-      <div v-if="showNewDialog" class="dialog-overlay" @click.self="closeNewDialog">
-        <div class="dialog">
-          <div class="dialog-title">{{ isEditing ? '编辑实例' : '新建实例' }}</div>
-          <div class="dialog-body">
-            <label class="field">
-              <span class="field-label">实例名称</span>
-              <input
-                v-model="newData.name"
-                type="text"
-                class="input"
-                :class="{ invalid: errors.name }"
-                placeholder="什么名字比较好呢？"
-              />
-              <span v-if="errors.name" class="field-error">请填写这个。</span>
-            </label>
-            <label class="field">
-              <span class="field-label">实例UUID</span>
-              <input
-                :value="newData.uuid"
-                type="text"
-                class="input mono"
-                readonly
-              />
-            </label>
-            <label class="field">
-              <span class="field-label">实例图标</span>
-              <div class="icon-selector" @click="showIconPicker = !showIconPicker">
-                <img class="icon-preview" :src="'/assets/instances/' + newData.icon" :alt="newData.icon" />
-                <span class="icon-name">{{ newData.icon }}</span>
-              </div>
-              <div v-if="showIconPicker" class="icon-grid">
-                <div
-                  v-for="icon in AVAILABLE_ICONS"
-                  :key="icon"
-                  class="icon-option"
-                  :class="{ selected: icon === newData.icon }"
-                  @click="selectIcon(icon)"
-                >
-                  <img :src="'/assets/instances/' + icon" :alt="icon" />
-                </div>
-              </div>
-            </label>
-            <label class="field">
-              <span class="field-label">
-                实例启动命令
-                <span v-if="isEditingLocked" class="field-hint">（停止实例后方可修改）</span>
-              </span>
-              <input
-                v-model="newData.command"
-                type="text"
-                class="input mono"
-                :class="{ invalid: errors.command }"
-                :disabled="isEditingLocked"
-                placeholder="java -jar xxx.jar"
-              />
-              <span v-if="errors.command" class="field-error">请填写这个。</span>
-            </label>
-            <label class="field">
-              <span class="field-label">
-                实例文件夹
-                <span v-if="isEditingLocked" class="field-hint">（停止实例后方可修改）</span>
-              </span>
-              <input
-                v-model="newData.folder"
-                type="text"
-                class="input mono"
-                :class="{ invalid: errors.folder }"
-                :disabled="isEditingLocked"
-                placeholder="path/to/your/folder"
-              />
-              <span v-if="errors.folder" class="field-error">请填写这个。</span>
-            </label>
-            <label class="field">
-              <span class="field-label">实例停止方法</span>
-              <input
-                v-model="newData.stopCommand"
-                type="text"
-                class="input mono"
-                placeholder="^C"
-              />
-            </label>
-            <label class="field field-row">
-              <input type="checkbox" class="checkbox" v-model="newData.autoStart" />
-              <span class="field-label">自动启动？</span>
-            </label>
-          </div>
-          <div class="dialog-actions">
-            <button class="btn btn-secondary" @click="closeNewDialog">取消</button>
-            <button class="btn btn-primary" :disabled="saving" @click="createInstance">
-              {{ saving ? '保存中…' : isEditing ? '保存' : '创建' }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== 设置对话框 ===== -->
-      <div v-if="showSettings" class="dialog-overlay" @click.self="closeSettings">
-        <div class="dialog">
-          <div class="dialog-title">设置 — {{ activeNode?.name || '节点' }}</div>
-          <div class="dialog-body">
-            <label class="field">
-              <span class="field-label">默认Shell</span>
-              <input
-                v-model="settings.defaultShell"
-                type="text"
-                class="input mono"
-                placeholder="/usr/bin/bash"
-              />
-            </label>
-          </div>
-          <div class="dialog-actions">
-            <button class="btn btn-secondary" @click="closeSettings">取消</button>
-            <button class="btn btn-primary" :disabled="savingSettings" @click="saveSettings">
-              {{ savingSettings ? '保存中…' : '保存' }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== 删除确认对话框 ===== -->
-      <div v-if="showDeleteConfirm" class="dialog-overlay" @click.self="cancelDelete">
-        <div class="dialog dialog-sm">
-          <div class="dialog-title">真的要删除该实例吗？</div>
-          <div class="dialog-body">
-            <p class="delete-warning">
-              如果该实例处于运行状态，则会强制中止并删除该实例。
-              删除实例后面板并不会清除其文件夹中的数据，如果需要删除，请手动操作。
-            </p>
-          </div>
-          <div class="dialog-actions">
-            <button class="btn btn-secondary" @click="cancelDelete">取消</button>
-            <button class="btn btn-danger" @click="confirmDelete">确认删除</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `,
 });
+</script>

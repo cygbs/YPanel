@@ -4,8 +4,8 @@
   "description": "YPanel - Web Minecraft server manager",
   "private": true,
   "scripts": {
-    "build:client": "esbuild src/client.ts --bundle --outfile=public/client.js --alias:vue=./node_modules/vue/dist/vue.esm-browser.prod.js --minify --define:process.env.NODE_ENV=\"\\\"production\\\"\"",
-    "build:client:dev": "esbuild src/client.ts --bundle --outfile=public/client.js --alias:vue=./node_modules/vue/dist/vue.esm-browser.js",
+    "build:client": "node scripts/build-client.mjs --prod",
+    "build:client:dev": "node scripts/build-client.mjs",
     "build:hub": "esbuild src/hub.ts --bundle --platform=node --outfile=dist/index.js --minify",
     "build:node": "esbuild src/node.ts --bundle --platform=node --outfile=dist-node/index.js --external:node-pty --minify",
     "build": "npm run build:client && npm run build:hub && npm run build:node && node scripts/copy-dist.js",
