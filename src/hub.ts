@@ -362,8 +362,56 @@ function handleLinkConnection(ws: WebSocket): void {
   ws.on('error', cleanup);
 }
 
+/** 将任意数据转为字符串 */
+function bufToStr(data: any): string {
+  if (typeof data === 'string') return data;
+  if (Buffer.isBuffer(data)) return data.toString('utf-8');
+  if (data instanceof ArrayBuffer) return Buffer.from(data).toString('utf-8');
+  return String(data);
+}
+
+/** 创建到目标节点的 WebSocket 代理 */
+function createNodeProxy(ws: WebSocket, nodeWsUrl: string, onMsg?: (msg: string) => string): void {
+  const nodeWs = new WebSocket(nodeWsUrl);
+  let nodeOpen = false;
+  let buffer: string[] = [];
+
+  nodeWs.on('open', () => {
+    nodeOpen = true;
+    for (const msg of buffer) { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.send(msg); }
+    buffer = [];
+  });
+
+  nodeWs.on('message', (data) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      const msg = bufToStr(data);
+      ws.send(onMsg ? onMsg(msg) : msg);
+    }
+  });
+  nodeWs.on('close', () => { ws.close(); });
+  nodeWs.on('error', () => { ws.close(); });
+
+  ws.on('message', (raw) => {
+    const text = bufToStr(raw);
+    if (nodeOpen && nodeWs.readyState === WebSocket.OPEN) { nodeWs.send(text); }
+    else if (!nodeOpen) { buffer.push(text); }
+  });
+  ws.on('close', () => { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.close(); });
+  ws.on('error', () => { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.close(); });
+}
+
+/** 验证令牌并返回节点信息 */
+function authenticateWs(parsed: URL): { token: string; nodeId: number } | null {
+  const token = parsed.searchParams.get('token');
+  if (!token || !sessions.has(token)) return null;
+  const nodeIdStr = parsed.searchParams.get('nodeId');
+  const nodeId = nodeIdStr ? parseInt(nodeIdStr, 10) : null;
+  if (nodeId === null || isNaN(nodeId)) return null;
+  return { token, nodeId };
+}
+
 // ═══════════════════════════════════════════════════
-// WebSocket: 终端代理（需要 token 认证）
+// WebSocket: 终端代理 & 文件上传代理（需要 token 认证）
 // ═══════════════════════════════════════════════════
 
 wss.on('connection', (ws: WebSocket, req) => {
@@ -375,67 +423,49 @@ wss.on('connection', (ws: WebSocket, req) => {
     return;
   }
 
-  // /ws 路径 → 终端代理（需验证 token）
-  const token = parsed.searchParams.get('token');
-  if (!token || !sessions.has(token)) {
-    ws.send('Authentication required.\r\n');
+  // ── 需要 token 认证 ──
+  const auth = authenticateWs(parsed);
+  if (!auth) {
+    const isJson = parsed.pathname === '/upload';
+    if (isJson) {
+      ws.send(JSON.stringify({ type: 'upload_error', message: 'Authentication required' }));
+    } else {
+      ws.send('Authentication required.\r\n');
+    }
     ws.close();
     return;
   }
 
-  const nodeIdStr = parsed.searchParams.get('nodeId');
-  const instanceIdStr = parsed.searchParams.get('instanceId');
-  const nodeId = nodeIdStr ? parseInt(nodeIdStr, 10) : null;
-  const instanceId = instanceIdStr ? parseInt(instanceIdStr, 10) : null;
-
-  if (nodeId === null || isNaN(nodeId)) {
-    ws.send('Please specify nodeId (e.g. /ws?nodeId=0)\r\n');
-    ws.close();
-    return;
-  }
-
-  const node = getConnectedNode(nodeId);
+  const node = getConnectedNode(auth.nodeId);
   if (!node) {
-    ws.send('Node not found or offline.\r\n');
+    const isJson = parsed.pathname === '/upload';
+    if (isJson) {
+      ws.send(JSON.stringify({ type: 'upload_error', message: 'Node not found or offline' }));
+    } else {
+      ws.send('Node not found or offline.\r\n');
+    }
     ws.close();
     return;
   }
 
-  const nodeQuery = new URLSearchParams();
-  if (instanceId !== null && !isNaN(instanceId)) {
-    nodeQuery.set('instanceId', String(instanceId));
+  if (parsed.pathname === '/upload') {
+    // ── 文件上传代理 ──
+    const nodeWsUrl = `ws://${node.address}:${node.port}/upload`;
+    console.log(`[proxy] upload: hub → node #${auth.nodeId}`);
+    createNodeProxy(ws, nodeWsUrl);
+
+  } else {
+    // ── 终端代理（/ws） ──
+    const instanceIdStr = parsed.searchParams.get('instanceId');
+    const instanceId = instanceIdStr ? parseInt(instanceIdStr, 10) : null;
+    const nodeQuery = new URLSearchParams();
+    if (instanceId !== null && !isNaN(instanceId)) {
+      nodeQuery.set('instanceId', String(instanceId));
+    }
+    const nodeWsUrl = `ws://${node.address}:${node.port}/ws${nodeQuery.toString() ? '?' + nodeQuery.toString() : ''}`;
+    console.log(`[proxy] WS: hub → node #${auth.nodeId} ${nodeWsUrl}`);
+    createNodeProxy(ws, nodeWsUrl);
   }
-  const nodeWsUrl = `ws://${node.address}:${node.port}/ws${nodeQuery.toString() ? '?' + nodeQuery.toString() : ''}`;
-  console.log(`[proxy] WS: hub → node #${nodeId} ${nodeWsUrl}`);
-
-  function bufToStr(data: any): string {
-    if (typeof data === 'string') return data;
-    if (Buffer.isBuffer(data)) return data.toString('utf-8');
-    if (data instanceof ArrayBuffer) return Buffer.from(data).toString('utf-8');
-    return String(data);
-  }
-
-  const nodeWs = new WebSocket(nodeWsUrl);
-  let nodeOpen = false;
-  let buffer: string[] = [];
-
-  nodeWs.on('open', () => {
-    nodeOpen = true;
-    for (const msg of buffer) { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.send(msg); }
-    buffer = [];
-  });
-
-  nodeWs.on('message', (data) => { if (ws.readyState === WebSocket.OPEN) ws.send(bufToStr(data)); });
-  nodeWs.on('close', () => { ws.close(); });
-  nodeWs.on('error', () => { ws.close(); });
-
-  ws.on('message', (raw) => {
-    const text = bufToStr(raw);
-    if (nodeOpen && nodeWs.readyState === WebSocket.OPEN) { nodeWs.send(text); }
-    else if (!nodeOpen) { buffer.push(text); }
-  });
-  ws.on('close', () => { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.close(); });
-  ws.on('error', () => { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.close(); });
 });
 
 app.get('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only' }));

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export YPANEL_VER=1.3.2
+export YPANEL_VER=1.3.4
 
 # 定义需要检查的命令列表
 commands=("curl" "unzip" "systemctl" "node")

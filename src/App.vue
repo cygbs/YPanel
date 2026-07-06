@@ -70,7 +70,7 @@
         <div class="quick-actions">
           <template v-if="activeNodeId !== null">
             <button @click="openNewInstance">新建实例</button>
-            <button>打开文件夹…</button>
+            <button @click="openUploadDialog">上传文件…</button>
             <button @click="openSettings">设置</button>
             <button @click="leaveNode" class="qa-back">返回节点列表</button>
           </template>
@@ -394,6 +394,68 @@
           <button class="btn btn-primary" :disabled="savingSettings" @click="saveSettings">
             {{ savingSettings ? '保存中…' : '保存' }}
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 上传文件对话框 ===== -->
+    <div v-if="showUploadDialog" class="dialog-overlay" @click.self="cancelUpload">
+      <div class="dialog">
+        <div class="dialog-title">上传文件</div>
+        <div class="dialog-body">
+          <template v-if="!uploadFile">
+            <div class="upload-dropzone" @click="triggerFileInput" @dragover.prevent @drop.prevent="onFileDrop">
+              <div class="upload-hint">点击选择文件或拖拽文件到此处</div>
+            </div>
+            <input ref="fileInputRef" type="file" class="upload-input-hidden" @change="onFileSelected" />
+          </template>
+          <template v-else>
+            <label class="field">
+              <span class="field-label">文件</span>
+              <input type="text" class="input mono" :value="uploadFile.name" readonly />
+            </label>
+            <label class="field">
+              <span class="field-label">大小</span>
+              <input type="text" class="input" :value="formatSize(uploadFile.size)" readonly />
+            </label>
+            <label class="field">
+              <span class="field-label">上传路径（留空使用节点的家目录）</span>
+              <input
+                v-model="uploadPath"
+                type="text"
+                class="input mono"
+                placeholder="留空则上传到家目录"
+              />
+            </label>
+            <div v-if="uploadStatus" class="upload-status-area">
+              <div class="upload-progress-bar">
+                <div class="upload-progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+              </div>
+              <div class="upload-progress-text">
+                <template v-if="uploadStatus === 'uploading'">
+                  上传中… {{ formatSize(uploadReceived) }} / {{ formatSize(uploadTotal) }}
+                </template>
+                <template v-else-if="uploadStatus === 'complete'">
+                  上传完成
+                </template>
+                <template v-else-if="uploadStatus === 'error'">
+                  {{ uploadError }}
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="dialog-actions">
+          <template v-if="!uploadFile">
+            <button class="btn btn-secondary" @click="cancelUpload">关闭</button>
+          </template>
+          <template v-else-if="uploadStatus === 'idle' || uploadStatus === 'error'">
+            <button class="btn btn-secondary" @click="cancelUpload">取消</button>
+            <button class="btn btn-primary" @click="startUpload">上传</button>
+          </template>
+          <template v-else-if="uploadStatus === 'complete'">
+            <button class="btn btn-primary" @click="cancelUpload">完成</button>
+          </template>
         </div>
       </div>
     </div>
@@ -1066,6 +1128,152 @@ export default defineComponent({
       }
     }
 
+    // ── 文件上传 ──
+    const CHUNK_SIZE = 64 * 1024; // 64KB
+    const showUploadDialog = ref(false);
+    const uploadFile = ref<File | null>(null);
+    const uploadPath = ref('');
+    const uploadStatus = ref<'idle' | 'uploading' | 'complete' | 'error'>('idle');
+    const uploadProgress = ref(0);
+    const uploadReceived = ref(0);
+    const uploadTotal = ref(0);
+    const uploadError = ref('');
+    const fileInputRef = ref<HTMLInputElement | null>(null);
+    let uploadWs: WebSocket | null = null;
+
+    function formatSize(bytes: number): string {
+      if (bytes === 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+    }
+
+    function openUploadDialog(): void {
+      showUploadDialog.value = true;
+      uploadFile.value = null;
+      uploadPath.value = '';
+      uploadStatus.value = 'idle';
+      uploadProgress.value = 0;
+      uploadReceived.value = 0;
+      uploadTotal.value = 0;
+      uploadError.value = '';
+    }
+
+    function cancelUpload(): void {
+      if (uploadWs) { uploadWs.close(); uploadWs = null; }
+      showUploadDialog.value = false;
+      uploadFile.value = null;
+      uploadStatus.value = 'idle';
+    }
+
+    function triggerFileInput(): void {
+      fileInputRef.value?.click();
+    }
+
+    function onFileSelected(e: Event): void {
+      const input = e.target as HTMLInputElement;
+      if (input.files && input.files.length > 0) {
+        uploadFile.value = input.files[0];
+        uploadStatus.value = 'idle';
+      }
+    }
+
+    function onFileDrop(e: DragEvent): void {
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        uploadFile.value = files[0];
+        uploadStatus.value = 'idle';
+      }
+    }
+
+    function startUpload(): void {
+      const file = uploadFile.value;
+      if (!file || activeNodeId.value === null) return;
+
+      uploadStatus.value = 'uploading';
+      uploadProgress.value = 0;
+      uploadReceived.value = 0;
+      uploadTotal.value = file.size;
+
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      const params = `token=${encodeURIComponent(token || '')}&nodeId=${activeNodeId.value}`;
+      uploadWs = new WebSocket(`${protocol}//${location.host}/upload?${params}`);
+
+      uploadWs.onopen = () => {
+        // 发送开始消息
+        uploadWs!.send(JSON.stringify({
+          type: 'upload_start',
+          fileName: file.name,
+          uploadPath: uploadPath.value,
+          fileSize: file.size,
+        }));
+      };
+
+      uploadWs.onmessage = async (event) => {
+        let msg: any;
+        try { msg = JSON.parse(event.data); } catch { return; }
+
+        if (msg.type === 'upload_ack' && msg.status === 'ready') {
+          // 开始分片上传
+          const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+          for (let i = 0; i < totalChunks; i++) {
+            if (!uploadWs || uploadWs.readyState !== WebSocket.OPEN) break;
+
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const chunk = file.slice(start, end);
+            const buffer = await chunk.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let j = 0; j < bytes.length; j++) {
+              binary += String.fromCharCode(bytes[j]);
+            }
+            const base64 = btoa(binary);
+
+            const isFinal = i === totalChunks - 1;
+            uploadWs.send(JSON.stringify({
+              type: 'upload_chunk',
+              data: base64,
+              index: i,
+              total: totalChunks,
+              final: isFinal,
+            }));
+
+            uploadReceived.value = end;
+            uploadProgress.value = Math.round((end / file.size) * 100);
+          }
+        } else if (msg.type === 'upload_progress') {
+          uploadReceived.value = msg.received;
+          uploadProgress.value = Math.round((msg.received / msg.total) * 100);
+        } else if (msg.type === 'upload_complete') {
+          uploadStatus.value = 'complete';
+          uploadProgress.value = 100;
+          uploadWs?.close();
+          uploadWs = null;
+        } else if (msg.type === 'upload_error') {
+          uploadStatus.value = 'error';
+          uploadError.value = msg.message || '上传失败';
+          uploadWs?.close();
+          uploadWs = null;
+        }
+      };
+
+      uploadWs.onerror = () => {
+        uploadStatus.value = 'error';
+        uploadError.value = '连接失败';
+        uploadWs = null;
+      };
+
+      uploadWs.onclose = () => {
+        if (uploadStatus.value === 'uploading') {
+          uploadStatus.value = 'error';
+          uploadError.value = '连接断开';
+        }
+        uploadWs = null;
+      };
+    }
+
     // ── 初始化 ──
     loadNodes();
     const nodesTimer = setInterval(() => loadNodes(), 5000);
@@ -1102,6 +1310,13 @@ export default defineComponent({
       openTerminal, openEditInstance,
       openSettings, closeSettings, saveSettings,
       openDeleteConfirm, confirmDelete, cancelDelete,
+      // 文件上传
+      showUploadDialog, uploadFile, uploadPath,
+      uploadStatus, uploadProgress, uploadReceived, uploadTotal,
+      uploadError, fileInputRef,
+      openUploadDialog, cancelUpload,
+      triggerFileInput, onFileSelected, onFileDrop,
+      startUpload, formatSize,
       AVAILABLE_ICONS,
     };
   },

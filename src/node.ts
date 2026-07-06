@@ -256,11 +256,135 @@ app.put('/api/settings', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════
-// WebSocket: 终端连接
+// WebSocket: 文件上传
+// ═══════════════════════════════════════════════════
+
+/** 正在进行的文件上传状态 */
+const uploadStates = new Map<WebSocket, {
+  fileName: string;
+  filePath: string;
+  stream: fs.WriteStream;
+  received: number;
+  total: number;
+}>();
+
+function handleUploadConnection(ws: WebSocket): void {
+  ws.on('message', (raw: Buffer | ArrayBuffer | Buffer[]) => {
+    let msg: any;
+    try { msg = JSON.parse(raw.toString()); } catch { return; }
+
+    if (msg.type === 'upload_start') {
+      // ── 开始上传 ──
+      if (uploadStates.has(ws)) {
+        ws.send(JSON.stringify({ type: 'upload_error', message: '已有上传任务进行中' }));
+        return;
+      }
+
+      const fileName = path.basename(msg.fileName || '');
+      if (!fileName) {
+        ws.send(JSON.stringify({ type: 'upload_error', message: '文件名无效' }));
+        return;
+      }
+
+      // 路径：用户指定 → 拼接；空 → 家目录
+      const userPath = (msg.uploadPath || '').trim();
+      const baseDir = userPath
+        ? path.resolve(userPath.replace(/^~/, os.homedir()))
+        : os.homedir();
+      const filePath = path.join(baseDir, fileName);
+
+      console.log(`[upload] start: ${filePath} (${msg.fileSize || '?'} bytes)`);
+
+      try {
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        const stream = fs.createWriteStream(filePath);
+
+        uploadStates.set(ws, {
+          fileName,
+          filePath,
+          stream,
+          received: 0,
+          total: msg.fileSize || 0,
+        });
+
+        ws.send(JSON.stringify({
+          type: 'upload_ack',
+          status: 'ready',
+          filePath,
+        }));
+      } catch (e: any) {
+        ws.send(JSON.stringify({ type: 'upload_error', message: `无法创建文件: ${e.message}` }));
+      }
+    } else if (msg.type === 'upload_chunk') {
+      // ── 接收数据块 ──
+      const state = uploadStates.get(ws);
+      if (!state) {
+        ws.send(JSON.stringify({ type: 'upload_error', message: '未开始上传' }));
+        return;
+      }
+
+      try {
+        const chunk = Buffer.from(msg.data || '', 'base64');
+        state.stream.write(chunk);
+        state.received += chunk.length;
+
+        // 最终块
+        if (msg.index === msg.total - 1 || msg.final) {
+          state.stream.end();
+          uploadStates.delete(ws);
+          console.log(`[upload] complete: ${state.filePath} (${state.received} bytes)`);
+          ws.send(JSON.stringify({
+            type: 'upload_complete',
+            fileName: state.fileName,
+            path: state.filePath,
+            size: state.received,
+          }));
+        } else {
+          // 进度
+          ws.send(JSON.stringify({
+            type: 'upload_progress',
+            received: state.received,
+            total: state.total,
+          }));
+        }
+      } catch (e: any) {
+        ws.send(JSON.stringify({ type: 'upload_error', message: `写入失败: ${e.message}` }));
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    const state = uploadStates.get(ws);
+    if (state) {
+      try { state.stream.end(); } catch { /* ignore */ }
+      uploadStates.delete(ws);
+      console.log(`[upload] interrupted: ${state.filePath}`);
+    }
+  });
+
+  ws.on('error', () => {
+    const state = uploadStates.get(ws);
+    if (state) {
+      try { state.stream.end(); } catch { /* ignore */ }
+      uploadStates.delete(ws);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// WebSocket: 终端连接 / 文件上传
 // ═══════════════════════════════════════════════════
 
 wss.on('connection', (ws: WebSocket, req) => {
   const parsed = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
+
+  // ── /upload 路径 → 文件上传 ──
+  if (parsed.pathname === '/upload') {
+    handleUploadConnection(ws);
+    return;
+  }
+
+  // ── /ws 路径 → 终端代理 ──
   const instanceIdStr = parsed.searchParams.get('instanceId');
   const instanceId = instanceIdStr ? parseInt(instanceIdStr, 10) : null;
 
