@@ -385,7 +385,7 @@
               v-model="settings.defaultShell"
               type="text"
               class="input mono"
-              :placeholder="detectedShell"
+              placeholder="留空则自动检测"
             />
           </label>
         </div>
@@ -786,7 +786,6 @@ export default defineComponent({
     const showSettings = ref(false);
     const savingSettings = ref(false);
     const settings = reactive({ defaultShell: '' });
-    const detectedShell = ref('/bin/sh');
     const showDeleteConfirm = ref(false);
     const saving = ref(false);
 
@@ -1020,7 +1019,6 @@ export default defineComponent({
         if (res.ok) {
           const data = await res.json();
           settings.defaultShell = data.defaultShell || '';
-          detectedShell.value = data.detectedShell || '/bin/sh';
         }
       } catch { /* ignore */ }
     }
@@ -1102,7 +1100,7 @@ export default defineComponent({
       openNewInstance, closeNewDialog, selectIcon,
       createInstance, startInstance, stopInstance,
       openTerminal, openEditInstance,
-      openSettings, closeSettings, saveSettings, detectedShell,
+      openSettings, closeSettings, saveSettings,
       openDeleteConfirm, confirmDelete, cancelDelete,
       AVAILABLE_ICONS,
     };

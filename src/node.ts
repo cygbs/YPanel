@@ -64,22 +64,11 @@ function writeInstances(data: { instances: any[] }): void {
   fs.writeFileSync(INSTANCES_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-/** 检测当前系统默认 Shell */
-function detectDefaultShell(): string {
-  if (process.platform === 'win32') {
-    return process.env.COMSPEC || 'powershell.exe';
-  }
-  return process.env.SHELL || '/bin/sh';
-}
-
 function readSettings(): { defaultShell: string } {
   ensureDataDir();
-  if (!fs.existsSync(SETTINGS_FILE)) return { defaultShell: detectDefaultShell() };
-  try {
-    const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
-    return { defaultShell: data.defaultShell || detectDefaultShell() };
-  }
-  catch { return { defaultShell: detectDefaultShell() }; }
+  if (!fs.existsSync(SETTINGS_FILE)) return { defaultShell: '' };
+  try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')); }
+  catch { return { defaultShell: '' }; }
 }
 
 function writeSettings(s: any): void {
@@ -87,8 +76,8 @@ function writeSettings(s: any): void {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2), 'utf-8');
 }
 
-function getDefaultShell(): string {
-  return readSettings().defaultShell;
+function getDefaultShell(): string | undefined {
+  return readSettings().defaultShell || undefined;
 }
 
 // ── 进程管理器 ──
@@ -257,10 +246,7 @@ app.get('/api/instances/:id/status', (req, res) => {
 
 // ── 设置 API ──
 
-app.get('/api/settings', (_req, res) => {
-  const s = readSettings();
-  res.json({ ...s, detectedShell: detectDefaultShell() });
-});
+app.get('/api/settings', (_req, res) => res.json(readSettings()));
 app.put('/api/settings', (req, res) => {
   const { defaultShell } = req.body;
   const s = readSettings();
