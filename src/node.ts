@@ -14,7 +14,7 @@
 import express from 'express';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { spawn, IPty } from 'node-pty';
+import { spawn, type IPty } from 'zigpty';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';

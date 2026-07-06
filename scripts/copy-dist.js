@@ -33,68 +33,21 @@ if (fs.existsSync(dataDir)) {
   fs.cpSync(dataDir, path.join(NODE_DIST, 'data'), { recursive: true, force: true });
 }
 
-// ── 处理 node-pty 原生模块 ──
-const PTY_SRC = path.join(ROOT, 'node_modules', 'node-pty');
-const PTY_DST = path.join(NODE_DIST, 'node_modules', 'node-pty');
+// ── 处理 zigpty 原生模块 ──
+// zigpty 体积很小（~176 KB 安装），且预构建了 8 个平台的 .node 二进制
+// 不需要 node-gyp / C++ 工具链
+const ZIG_SRC = path.join(ROOT, 'node_modules', 'zigpty');
+const ZIG_DST = path.join(NODE_DIST, 'node_modules', 'zigpty');
 
-// 1. 复制 JS 运行时 & 元数据（lib + package.json）
-fs.cpSync(path.join(PTY_SRC, 'lib'), path.join(PTY_DST, 'lib'), { recursive: true, force: true });
-fs.cpSync(path.join(PTY_SRC, 'package.json'), path.join(PTY_DST, 'package.json'), { force: true });
+fs.mkdirSync(path.join(ZIG_DST, 'dist'), { recursive: true });
+fs.cpSync(path.join(ZIG_SRC, 'dist'), path.join(ZIG_DST, 'dist'), { recursive: true, force: true });
 
-// 2. 获取 pty.node 二进制（按优先级尝试）
-let binaryCopied = false;
+fs.mkdirSync(path.join(ZIG_DST, 'prebuilds'), { recursive: true });
+fs.cpSync(path.join(ZIG_SRC, 'prebuilds'), path.join(ZIG_DST, 'prebuilds'), { recursive: true, force: true });
 
-// 优先级 1：官方预编译包 prebuilds（例如 npm i 时下载的）
-const platformArch = `${process.platform}-${process.arch}`;  // linux-x64
-const prebuildFile = path.join(PTY_SRC, 'prebuilds', platformArch, 'pty.node');
-if (fs.existsSync(prebuildFile)) {
-  // 复制整个 prebuilds 目录（包含所有平台，方便分发）
-  fs.cpSync(
-    path.join(PTY_SRC, 'prebuilds'),
-    path.join(PTY_DST, 'prebuilds'),
-    { recursive: true, force: true }
-  );
-  console.log(`  node-pty: prebuilds copied (including ${platformArch})`);
-  binaryCopied = true;
-}
+fs.cpSync(path.join(ZIG_SRC, 'package.json'), path.join(ZIG_DST, 'package.json'), { force: true });
 
-// 优先级 2：从 node-gyp 编译产物 build/Release 直接复制
-if (!binaryCopied) {
-  const buildRelease = path.join(PTY_SRC, 'build', 'Release', 'pty.node');
-  if (fs.existsSync(buildRelease)) {
-    fs.mkdirSync(path.join(PTY_DST, 'build', 'Release'), { recursive: true });
-    fs.cpSync(buildRelease, path.join(PTY_DST, 'build', 'Release', 'pty.node'));
-    console.log('  node-pty: build/Release/pty.node copied');
-    binaryCopied = true;
-  }
-}
-
-// 优先级 3：以上都无，尝试现场编译（需要 node-gyp 和 C++ 工具链）
-if (!binaryCopied) {
-  console.log('  node-pty: no binary found, trying to rebuild...');
-  try {
-    require('child_process').execSync('npx node-gyp rebuild', {
-      cwd: PTY_SRC,
-      stdio: 'pipe'
-    });
-    const freshBuild = path.join(PTY_SRC, 'build', 'Release', 'pty.node');
-    if (fs.existsSync(freshBuild)) {
-      fs.mkdirSync(path.join(PTY_DST, 'build', 'Release'), { recursive: true });
-      fs.cpSync(freshBuild, path.join(PTY_DST, 'build', 'Release', 'pty.node'));
-      console.log('  node-pty: rebuilt and copied successfully');
-      binaryCopied = true;
-    }
-  } catch (e) {
-    console.error('  node-pty: rebuild failed. Install build-essential and python3, then try again.');
-    console.error('  Error:', e.stderr?.toString() || e.message);
-    process.exit(1);
-  }
-}
-
-if (!binaryCopied) {
-  console.error('  node-pty: could not obtain pty.node');
-  process.exit(1);
-}
+console.log('  zigpty: dist + prebuilds copied');
 
 console.log('Node dist built: run node dist-node/index.js -s <hub-url> -t <token> [-p <port>]');
 console.log('');
