@@ -253,11 +253,11 @@
           </label>
           <label class="field">
             <span class="field-label">节点图标</span>
-            <div class="icon-selector" @click="showIconPicker = !showIconPicker">
+            <div class="icon-selector" @click="showNodeIconPicker = !showNodeIconPicker">
               <img class="icon-preview" :src="'/assets/instances/' + editNodeData.icon" :alt="editNodeData.icon" />
               <span class="icon-name">{{ editNodeData.icon }}</span>
             </div>
-            <div v-if="showIconPicker" class="icon-grid">
+            <div v-if="showNodeIconPicker" class="icon-grid">
               <div
                 v-for="icon in AVAILABLE_ICONS"
                 :key="icon"
@@ -306,11 +306,11 @@
           </label>
           <label class="field">
             <span class="field-label">实例图标</span>
-            <div class="icon-selector" @click="showIconPicker = !showIconPicker">
+            <div class="icon-selector" @click="showInstanceIconPicker = !showInstanceIconPicker">
               <img class="icon-preview" :src="'/assets/instances/' + newData.icon" :alt="newData.icon" />
               <span class="icon-name">{{ newData.icon }}</span>
             </div>
-            <div v-if="showIconPicker" class="icon-grid">
+            <div v-if="showInstanceIconPicker" class="icon-grid">
               <div
                 v-for="icon in AVAILABLE_ICONS"
                 :key="icon"
@@ -507,10 +507,10 @@ interface TabData {
 }
 
 const AVAILABLE_ICONS = [
-  'bee.svg', 'bee_legacy.svg', 'brick.svg', 'chicken.svg',
+  'bee.svg', 'brick.svg', 'chicken.svg',
   'creeper.svg', 'diamond.svg', 'dirt.svg', 'enderman.svg',
   'enderpearl.svg', 'fabricmc.svg', 'flame.svg', 'fox.svg',
-  'fox_legacy.svg', 'ftb_logo.svg', 'gear.svg', 'gold.svg',
+  'ftb_logo.svg', 'gear.svg', 'gold.svg',
   'grass.svg', 'herobrine.svg', 'iron.svg', 'magitech.svg',
   'meat.svg', 'modrinth.svg', 'neoforged.svg', 'netherstar.svg',
   'planks.svg', 'prismlauncher.svg', 'quiltmc.svg', 'skeleton.svg',
@@ -518,10 +518,7 @@ const AVAILABLE_ICONS = [
 ];
 
 function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-  });
+  return crypto.randomUUID();
 }
 
 let nextTabId = 1;
@@ -637,10 +634,7 @@ export default defineComponent({
       authState.value = 'login';
       loginPassword.value = '';
       loginError.value = '';
-      // 重置所有界面状态
-      activeNodeId.value = null;
-      instances.value = [];
-      selectedId.value = null;
+      leaveNode();
       tabs.splice(1); // 保留第一个（主页），删除其余标签
       activeId.value = 0;
     }
@@ -828,13 +822,13 @@ export default defineComponent({
       if (!n) return;
       editNodeData.name = n.name;
       editNodeData.icon = n.icon || 'gear.svg';
-      showIconPicker.value = false;
+      showNodeIconPicker.value = false;
       showEditNodeDialog.value = true;
     }
 
     function closeEditNode(): void {
       showEditNodeDialog.value = false;
-      showIconPicker.value = false;
+      showNodeIconPicker.value = false;
     }
 
     async function saveEditNode(): Promise<void> {
@@ -871,7 +865,8 @@ export default defineComponent({
     const isEditingLocked = computed(() =>
       isEditing.value && editingId.value !== null && !!runningStates[editingId.value]
     );
-    const showIconPicker = ref(false);
+    const showNodeIconPicker = ref(false);
+    const showInstanceIconPicker = ref(false);
     const showSettings = ref(false);
     const savingSettings = ref(false);
     const settings = reactive({ defaultShell: '' });
@@ -918,7 +913,7 @@ export default defineComponent({
       newData.folder = inst.folder;
       newData.stopCommand = inst.stopCommand;
       newData.autoStart = !!inst.autoStart;
-      showIconPicker.value = false;
+      showInstanceIconPicker.value = false;
       showNewDialog.value = true;
       try {
         const res = await apiFetch(apiPrefix() + '/instances/' + inst.id + '/status');
@@ -931,14 +926,14 @@ export default defineComponent({
 
     function closeNewDialog(): void {
       showNewDialog.value = false;
-      showIconPicker.value = false;
+      showInstanceIconPicker.value = false;
       isEditing.value = false;
       editingId.value = null;
     }
 
     function selectIcon(name: string): void {
       newData.icon = name;
-      showIconPicker.value = false;
+      showInstanceIconPicker.value = false;
     }
 
     function selectInstance(id: number | null): void {
@@ -1331,7 +1326,7 @@ export default defineComponent({
       // 实例管理
       instances, selectedInstance, selectedId, selectInstance,
       runningStates, showNewDialog, isEditing, isEditingLocked,
-      showIconPicker, showSettings, savingSettings, saving,
+      showNodeIconPicker, showInstanceIconPicker, showSettings, savingSettings, saving,
       settings, errors, showDeleteConfirm, newData,
       openNewInstance, closeNewDialog, selectIcon,
       createInstance, startInstance, stopInstance,

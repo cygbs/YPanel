@@ -74,24 +74,9 @@ function hashPasswordSync(password: string): string {
   return bcrypt.hashSync(password, BCRYPT_ROUNDS);
 }
 
-/**
- * 验证密码并自动迁移旧版 SHA-256 哈希到 bcrypt
- * 返回 { match, newHash? }，服务端在匹配成功时更新存储
- */
-async function verifyAndMigrate(password: string, storedHash: string): Promise<{ match: boolean; newHash?: string }> {
-  // 已是 bcrypt
-  if (storedHash.startsWith('$2')) {
-    return { match: await bcrypt.compare(password, storedHash) };
-  }
-  // 旧版 SHA-256（64 位十六进制）
-  if (/^[0-9a-f]{64}$/i.test(storedHash)) {
-    const shaHash = crypto.createHash('sha256').update(password).digest('hex');
-    if (shaHash === storedHash) {
-      const newHash = await hashPassword(password);
-      return { match: true, newHash };
-    }
-  }
-  return { match: false };
+/** 验证密码 */
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  return bcrypt.compare(password, storedHash);
 }
 
 /** 生成随机密码 */
@@ -249,15 +234,10 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     const { password } = req.body;
     if (!password) { res.status(401).json({ error: 'invalid credentials' }); return; }
 
-    const result = await verifyAndMigrate(password, auth.hash);
-    if (!result.match) {
+    const match = await verifyPassword(password, auth.hash);
+    if (!match) {
       res.status(401).json({ error: 'invalid credentials' });
       return;
-    }
-    // 自动迁移旧哈希
-    if (result.newHash) {
-      auth.hash = result.newHash;
-      writeAuth(auth);
     }
     const { token, csrfToken } = createSession();
     setSessionCookie(req, res, token);
@@ -308,8 +288,8 @@ app.post('/api/auth/change-password', changePasswordLimiter, async (req, res) =>
       res.status(400).json({ error: 'old password is required' });
       return;
     }
-    const verify = await verifyAndMigrate(oldPassword, auth.hash);
-    if (!verify.match) {
+    const match = await verifyPassword(oldPassword, auth.hash);
+    if (!match) {
       res.status(403).json({ error: 'old password is incorrect' });
       return;
     }
@@ -790,30 +770,7 @@ wss.on('connection', (ws: WebSocket, req) => {
 app.get('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only' }));
 app.post('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only' }));
 
-// ── Hub 设置 ──
 
-const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
-
-function readHubSettings(): { listenPort: number } {
-  ensureDataDir();
-  if (!fs.existsSync(SETTINGS_FILE)) return { listenPort: 6699 };
-  try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')); }
-  catch { return { listenPort: 6699 }; }
-}
-
-app.get('/api/settings', (_req, res) => res.json(readHubSettings()));
-app.put('/api/settings', mutationLimiter, (req, res) => {
-  const { listenPort } = req.body;
-  const s = readHubSettings();
-  if (listenPort !== undefined) s.listenPort = listenPort;
-  writeSettings(s);
-  res.json(s);
-});
-
-function writeSettings(s: any): void {
-  ensureDataDir();
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2), 'utf-8');
-}
 
 // ═══════════════════════════════════════════════════
 // 启动

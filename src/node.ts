@@ -73,6 +73,38 @@ function getDefaultShell(): string | undefined {
   return readSettings().defaultShell || undefined;
 }
 
+/** 创建 PTY shell 进程 */
+function spawnShell(cwd: string): IPty {
+  return spawn(getDefaultShell(), [], {
+    name: 'xterm-color', cols: 80, rows: 24,
+    cwd,
+    env: { ...process.env } as { [key: string]: string },
+  });
+}
+
+/** 注册受控进程：绑定 onData / onExit / outputBuffer */
+function registerProcess(
+  pty: IPty,
+  instanceId: number,
+  wsTermIds: Set<string> = new Set()
+): ManagedProcess {
+  const entry: ManagedProcess = {
+    pty, outputBuffer: [], wsTermIds,
+    resizeCols: 80, resizeRows: 24,
+  };
+  pty.onData((data: string | Buffer) => {
+    const str = ptyDataToStr(data);
+    entry.outputBuffer.push(str);
+    if (entry.outputBuffer.length > 2000) entry.outputBuffer.shift();
+    for (const tid of entry.wsTermIds) {
+      sendToHub({ type: 'terminal_data', termId: tid, data: str });
+    }
+  });
+  pty.onExit(() => { managedProcesses.delete(instanceId); });
+  managedProcesses.set(instanceId, entry);
+  return entry;
+}
+
 // ── 进程管理器 ──
 interface ManagedProcess {
   pty: IPty;
@@ -325,7 +357,6 @@ function handleTerminalOpen(ws: WebSocket, msg: any): void {
     mp.wsTermIds.add(termId);
     termToProcess.set(termId, { instanceId });
 
-    // 发送缓冲区中最近 200 条输出
     const buf = mp.outputBuffer.slice(-200);
     for (const data of buf) {
       sendToHub({ type: 'terminal_data', termId, data });
@@ -334,17 +365,13 @@ function handleTerminalOpen(ws: WebSocket, msg: any): void {
     return;
   }
 
-  // ── 新进程：在实例目录中创建 shell ──
+  // ── 新进程 ──
   const inst = (instanceId !== null && instanceId !== undefined) ? getInstanceById(instanceId) : null;
   const cwd = inst?.folder || os.homedir();
 
-  let shell: IPty;
+  let pty: IPty;
   try {
-    shell = spawn(getDefaultShell(), [], {
-      name: 'xterm-color', cols: 80, rows: 24,
-      cwd,
-      env: { ...process.env } as { [key: string]: string },
-    });
+    pty = spawnShell(cwd);
   } catch (e: any) {
     sendToHub({ type: 'terminal_data', termId, data: `Failed to spawn shell: ${e.message}\r\n` });
     sendToHub({ type: 'terminal_closed', termId });
@@ -352,46 +379,20 @@ function handleTerminalOpen(ws: WebSocket, msg: any): void {
   }
 
   if (instanceId !== null && instanceId !== undefined) {
-    // ── 有关联实例：注册受控进程 ──
-    const entry: ManagedProcess = {
-      pty: shell, outputBuffer: [], wsTermIds: new Set([termId]),
-      resizeCols: 80, resizeRows: 24,
-    };
-    shell.onData((data: string | Buffer) => {
-      const str = ptyDataToStr(data);
-      entry.outputBuffer.push(str);
-      if (entry.outputBuffer.length > 2000) entry.outputBuffer.shift();
-      for (const termId of entry.wsTermIds) {
-        sendToHub({ type: 'terminal_data', termId, data: str });
-      }
-    });
-    shell.onExit(() => { managedProcesses.delete(instanceId); });
-    managedProcesses.set(instanceId, entry);
+    // ── 有关联实例 ──
+    registerProcess(pty, instanceId, new Set([termId]));
     termToProcess.set(termId, { instanceId });
-
-    if (inst?.folder) shell.write(`cd "${inst.folder}"\r`);
-    if (inst?.command) shell.write(`${inst.command}\r`);
+    if (inst?.folder) pty.write(`cd "${inst.folder}"\r`);
+    if (inst?.command) pty.write(`${inst.command}\r`);
     console.log(`[tunnel] terminal: termId=${termId} spawned shell for #${instanceId} in ${cwd}`);
   } else {
     // ── 普通终端（无实例关联） ──
     const unmanagedId = -Date.now();
-    const entry: ManagedProcess = {
-      pty: shell, outputBuffer: [], wsTermIds: new Set([termId]),
-      resizeCols: 80, resizeRows: 24,
-    };
-    shell.onData((data: string | Buffer) => {
-      const str = ptyDataToStr(data);
-      for (const termId of entry.wsTermIds) {
-        sendToHub({ type: 'terminal_data', termId, data: str });
-      }
-    });
-    shell.onExit(() => { managedProcesses.delete(unmanagedId); });
-    managedProcesses.set(unmanagedId, entry);
+    registerProcess(pty, unmanagedId, new Set([termId]));
     termToProcess.set(termId, { instanceId: unmanagedId });
-
     if (msg.initCommands) {
       for (const cmd of msg.initCommands) {
-        shell.write(cmd + '\r');
+        pty.write(cmd + '\r');
       }
     }
     console.log(`[tunnel] terminal: termId=${termId} spawned generic shell in ${cwd}`);
@@ -551,37 +552,15 @@ function cleanupAllState(): void {
 
 function autoStartInstances(): void {
   const data = readInstances();
-  const shellCmd = getDefaultShell();
   for (const inst of data.instances) {
     if (inst.autoStart && !managedProcesses.has(inst.id)) {
-      const pty = spawn(shellCmd, [], {
-        name: 'xterm-color', cols: 80, rows: 24,
-        cwd: inst.folder || os.homedir(),
-        env: { ...process.env } as { [key: string]: string },
-      });
-
-      const entry: ManagedProcess = {
-        pty, outputBuffer: [], wsTermIds: new Set(),
-        resizeCols: 80, resizeRows: 24,
-      };
-
-      pty.onData((data: string | Buffer) => {
-        const str = ptyDataToStr(data);
-        entry.outputBuffer.push(str);
-        if (entry.outputBuffer.length > 2000) entry.outputBuffer.shift();
-        for (const termId of entry.wsTermIds) {
-          sendToHub({ type: 'terminal_data', termId, data: str });
-        }
-      });
-
-      pty.onExit(() => {
-        managedProcesses.delete(inst.id);
-      });
-
-      managedProcesses.set(inst.id, entry);
-      pty.write(`cd "${inst.folder}"\r`);
-      pty.write(`${inst.command}\r`);
-      console.log(`  auto-start: #${inst.id} ${inst.name}`);
+      try {
+        const pty = spawnShell(inst.folder || os.homedir());
+        registerProcess(pty, inst.id);
+        pty.write(`cd "${inst.folder}"\r`);
+        pty.write(`${inst.command}\r`);
+        console.log(`  auto-start: #${inst.id} ${inst.name}`);
+      } catch { /* skip failed spawn */ }
     }
   }
 }

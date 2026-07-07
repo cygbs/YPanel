@@ -12,8 +12,6 @@ A web panel for Minecraft server.
 - 不仅仅是Minecraft服务器，理论上支持所有控制台程序。
 - 跨平台兼容，可以在多台不同架构、不同系统的服务器上安装。
 
-你可以[在这里](https://github.com/cygbs/YPanel/tree/main/images)预览这个面板。
-
 ### 劣势
 
 - 单用户设计（未来可能会增加多用户支持）。
