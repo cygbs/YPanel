@@ -34,6 +34,7 @@ const wss = new WebSocketServer({
   handleProtocols: (protocols) => protocols.values().next().value || false,
 });
 
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 
 // ── 路径解析（兼容 tsx 开发模式与 dist 构建模式） ──
@@ -224,19 +225,20 @@ const mutationLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-/** 设置 session cookie（HttpOnly + SameSite=Strict，省略 Secure 以兼容 HTTP） */
-function setSessionCookie(res: express.Response, token: string): void {
+/** 设置 session cookie（HttpOnly + SameSite=Strict，HTTPS 下启用 Secure） */
+function setSessionCookie(req: express.Request, res: express.Response, token: string): void {
   res.cookie(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'strict',
+    secure: req.secure,
     maxAge: SESSION_TTL_MS,
     path: '/',
   });
 }
 
 /** 清除 session cookie */
-function clearSessionCookie(res: express.Response): void {
-  res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+function clearSessionCookie(req: express.Request, res: express.Response): void {
+  res.clearCookie(SESSION_COOKIE_NAME, { path: '/', secure: req.secure });
 }
 
 /** 登录（仅需密码，用户名固定为 admin） */
@@ -258,7 +260,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       writeAuth(auth);
     }
     const { token, csrfToken } = createSession();
-    setSessionCookie(res, token);
+    setSessionCookie(req, res, token);
     res.json({ csrfToken, defaultPassword: auth.defaultPassword });
   } catch (e) {
     console.error('Login error:', e);
@@ -325,7 +327,7 @@ app.post('/api/auth/change-password', changePasswordLimiter, async (req, res) =>
 app.post('/api/auth/logout', (req, res) => {
   const token = getSessionCookie(req);
   if (token) revokeToken(token);
-  clearSessionCookie(res);
+  clearSessionCookie(req, res);
   res.json({ ok: true });
 });
 
