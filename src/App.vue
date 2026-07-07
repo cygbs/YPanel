@@ -78,6 +78,7 @@
             <button @click="openNodeDialog">新增节点…</button>
           </template>
           <button>帮助</button>
+          <button @click="doLogout" class="qa-back" style="margin-left:auto">退出登录</button>
         </div>
 
         <!-- 主体区域 -->
@@ -607,7 +608,7 @@ export default defineComponent({
         const res = await fetch('/api/auth/change-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') },
-          body: JSON.stringify({ newPassword: changeNewPassword.value }),
+          body: JSON.stringify({ oldPassword: loginPassword.value, newPassword: changeNewPassword.value }),
         });
         const data = await res.json();
         if (res.ok) {
@@ -617,6 +618,26 @@ export default defineComponent({
         }
       } catch { changeError.value = '网络错误'; }
       finally { changingPassword.value = false; }
+    }
+
+    async function doLogout(): Promise<void> {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: localStorage.getItem(AUTH_TOKEN_KEY) }),
+        });
+      } catch { /* ignore */ }
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      authState.value = 'login';
+      loginPassword.value = '';
+      loginError.value = '';
+      // 重置所有界面状态
+      activeNodeId.value = null;
+      instances.value = [];
+      selectedId.value = null;
+      tabs.splice(1); // 保留第一个（主页），删除其余标签
+      activeId.value = 0;
     }
 
     // 启动时检查认证
@@ -1197,8 +1218,9 @@ export default defineComponent({
 
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
-      const params = `token=${encodeURIComponent(token || '')}&nodeId=${activeNodeId.value}`;
-      uploadWs = new WebSocket(`${protocol}//${location.host}/upload?${params}`);
+      const params = `nodeId=${activeNodeId.value}`;
+      // 认证 token 通过 Sec-WebSocket-Protocol 头传递，不在 URL 中
+      uploadWs = new WebSocket(`${protocol}//${location.host}/upload?${params}`, token ? [token] : undefined);
 
       uploadWs.onopen = () => {
         // 发送开始消息
@@ -1285,7 +1307,7 @@ export default defineComponent({
       // 认证
       authState, loginPassword, loginError,
       changeNewPassword, changeConfirmPassword, changeError,
-      changingPassword, doLogin, doChangePassword,
+      changingPassword, doLogin, doChangePassword, doLogout,
       // 标签页
       tabs, activeId, terminalTabs,
       addTerminalTab, closeTab, switchTab, setTabRef,
