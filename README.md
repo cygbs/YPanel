@@ -24,19 +24,23 @@ A web panel for Minecraft server.
 
 一些面板单单是加载登录界面就需要消耗2~3秒，这个面板应该能确保加载时间小于一秒。它更不会替用户自作主张。
 
+如果你有一些服务器，那么用这个面板是很合适的，它不像别的面板那样要求节点暴露WS或者HTTP端口，所以即使节点在NAT后也可以进行控制。
+
 ## 运行
 
 无论如何，先确保有Node.js环境。请[安装好Node.js环境](https://nodejs.org/zh-cn/download)。
 
 **手动方式：**
 
-从[Releases](https://github.com/cygbs/YPanel/releases)下载`YPanel.zip`，解压之后，`dist`是`Hub`部分，`dist-node`是`Node`部分，需要配合使用。启动方法是`node index.js`。
+从[Releases](https://github.com/cygbs/YPanel/releases)下载`YPanel.zip`，解压之后，`dist`是`Hub`部分，`dist-node`是`Node`部分，需要配合使用。
+
+启动方法是，先进入`dist`目录执行`node index.js`启动Hub，然后在Hub中添加并获取Node端的启动命令，接着在`dist-node`文件夹中运行Node端启动命令，很快节点就能够连接上。
+
+你需要一个Hub和一个及以上的Node端来使用这个面板。**绝对不要使用root或者Administrator、SYSTEM这样的账户来运行面板和实例！这会将你置于危险之中。**
 
 ## 编译
 
-要编译这个程序，请[安装好Node.js环境](https://nodejs.org/zh-cn/download)，然后执行`npm i`和`npm run build`命令。结束后，`dist`是本程序的`Hub`部分，而`dist-node`是`Node`部分。
-
-`Hub`的作用是提供面板，`Node`的作用是实际管理实例。运行`Node`的服务器可以位于NAT后而不影响控制。只需要`Hub`暴露一个端口即可。你需要手动连接`Hub`与`Node`这两个部分。
+要编译这个程序，请[安装好Node.js环境](https://nodejs.org/zh-cn/download)，然后执行`npm i`和`npm run build`命令。对，就这么简单。
 
 ## todo
 
