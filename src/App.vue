@@ -225,7 +225,7 @@
         <div class="dialog-body">
           <div class="node-token-label" style="margin-bottom:8px">在目标机器上运行以下命令：</div>
           <div class="token-cmd-box">
-            <code class="token-cmd-text">node index.js -s ws://{{ locationHost }}/link -t {{ generatedToken }} -p 6701</code>
+            <code class="token-cmd-text">node index.js -s ws://{{ locationHost }}/link -t {{ generatedToken }}</code>
           </div>
           <div class="token-cmd-note">节点连接后此窗口将自动关闭。</div>
         </div>
@@ -758,7 +758,7 @@ export default defineComponent({
     }
 
     function copyToken(): void {
-      const cmd = `node index.js -s ws://${window.location.host}/link -t ${generatedToken.value} -p 6701`;
+      const cmd = `node index.js -s ws://${window.location.host}/link -t ${generatedToken.value}`;
       navigator.clipboard.writeText(cmd).catch(() => {});
     }
 
