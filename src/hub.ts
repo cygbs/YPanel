@@ -4,8 +4,11 @@
  * 职责：
  * - 提供网页面板界面（需登录）
  * - 管理节点（注册、列表、删除）
- * - 代理 HTTP 请求到节点上的 API
- * - 代理 WebSocket 终端到节点
+ * - 通过 /link WebSocket 隧道转发 API 调用到节点
+ * - 通过 /link WebSocket 隧道代理终端和文件上传
+ *
+ * 架构：Node 只通过 /link WebSocket 连接到 Hub，所有通信走此隧道，
+ *       双向皆由 Hub 上的同一条 WebSocket 承载。Node 不暴露端口。
  */
 
 import express from 'express';
@@ -44,16 +47,14 @@ function ensureDataDir(): void {
 // ═══════════════════════════════════════════════════
 
 interface AuthData {
-  hash: string;            // SHA-256 哈希
-  defaultPassword: boolean; // 是否仍为默认密码
+  hash: string;
+  defaultPassword: boolean;
 }
 
-/** SHA-256 哈希 */
 function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
 
-/** 生成随机密码 */
 function randomPassword(len = 12): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let pwd = '';
@@ -76,15 +77,14 @@ function writeAuth(data: AuthData): void {
   fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-/** 首次运行：生成随机密码 */
 function initAuth(): { password: string } {
   const password = randomPassword();
   writeAuth({ hash: hashPassword(password), defaultPassword: true });
   return { password };
 }
 
-// ── Session Token 管理 ──
-const sessions = new Map<string, boolean>(); // token → authenticated
+// ── Session Token ──
+const sessions = new Map<string, boolean>();
 
 function createToken(): string {
   const token = crypto.randomUUID();
@@ -92,7 +92,6 @@ function createToken(): string {
   return token;
 }
 
-// ── 初始化认证（首次运行时生成） ──
 let firstRunCreds: { password: string } | null = null;
 let authData = readAuth();
 if (!authData) {
@@ -108,7 +107,6 @@ if (!authData) {
 // API: 认证
 // ═══════════════════════════════════════════════════
 
-/** 登录（仅需密码，用户名固定为 admin） */
 app.post('/api/auth/login', (req, res) => {
   const auth = readAuth();
   if (!auth) { res.status(500).json({ error: 'auth not initialized' }); return; }
@@ -121,7 +119,6 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ token, defaultPassword: auth.defaultPassword });
 });
 
-/** 验证 token 状态 */
 app.post('/api/auth/check', (req, res) => {
   const { token } = req.body;
   if (token && sessions.has(token)) {
@@ -132,7 +129,6 @@ app.post('/api/auth/check', (req, res) => {
   }
 });
 
-/** 修改密码（需携带有效 token） */
 app.post('/api/auth/change-password', (req, res) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -154,34 +150,70 @@ app.post('/api/auth/change-password', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════
-// 认证中间件：保护 /api/* 路由（除 /api/auth/* 外）
+// 认证中间件
 // ═══════════════════════════════════════════════════
 
 app.use('/api', (req, res, next) => {
-  // /api/auth/* 不需要认证
-  if (req.path.startsWith('/auth/')) {
-    next();
-    return;
-  }
+  if (req.path.startsWith('/auth/')) { next(); return; }
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (token && sessions.has(token)) {
-    next();
-  } else {
-    res.status(401).json({ error: 'authentication required' });
-  }
+  if (token && sessions.has(token)) { next(); return; }
+  res.status(401).json({ error: 'authentication required' });
 });
 
 // ═══════════════════════════════════════════════════
-// 以下所有 /api/* 路由现在受认证中间件保护
+// /link WebSocket 隧道系统
+// ═══════════════════════════════════════════════════
+//
+// 所有 Hub→Node 的通信都通过 Node 主动建立的 /link WebSocket 进行。
+// 这条连接承载三种负载：
+//   1. API 请求/响应（一对一的 requestId 匹配）
+//   2. 终端流（每终端一个 termId）
+//   3. 文件上传（每上传一个 uploadSessionId）
+
+/** 节点连接池：nodeId → /link WebSocket */
+const nodeConnections = new Map<number, WebSocket>();
+
+// ── 待处理的 API 请求 ──
+interface PendingRequest {
+  resolve: (value: any) => void;
+  reject: (reason: any) => void;
+  timer: NodeJS.Timeout;
+}
+const pendingApiRequests = new Map<string, PendingRequest>();
+
+// ── 终端会话：termId → 浏览器端的 WebSocket ──
+const terminalSessions = new Map<string, WebSocket>();
+
+// ── 文件上传：uploadSessionId → 浏览器端的 WebSocket ──
+const uploadSessions = new Map<string, WebSocket>();
+
+/** 通过节点隧道发送一条 API 请求并等待响应 */
+function sendApiRequest(nodeId: number, method: string, path: string, body?: any): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const linkWs = nodeConnections.get(nodeId);
+    if (!linkWs || linkWs.readyState !== WebSocket.OPEN) {
+      reject(new Error('Node not connected'));
+      return;
+    }
+    const requestId = crypto.randomUUID();
+    const timer = setTimeout(() => {
+      pendingApiRequests.delete(requestId);
+      reject(new Error('Request timeout'));
+    }, 30000);
+    pendingApiRequests.set(requestId, { resolve, reject, timer });
+    linkWs.send(JSON.stringify({ type: 'api_request', requestId, method, path, body }));
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// 节点管理
 // ═══════════════════════════════════════════════════
 
 interface NodeEntry {
   id: number;
   name: string;
   token: string;
-  address: string;
-  port: number;
   connected: boolean;
   lastSeen: string;
   icon?: string;
@@ -209,15 +241,6 @@ function writeNodes(data: NodesData): void {
   ensureDataDir();
   fs.writeFileSync(NODES_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
-
-function getConnectedNode(nodeId: number): { address: string; port: number } | null {
-  const data = readNodes();
-  const node = data.nodes.find(n => n.id === nodeId);
-  if (!node || !node.connected) return null;
-  return { address: node.address, port: node.port };
-}
-
-const nodeConnections = new Map<number, WebSocket>();
 
 // ── API: 节点管理 ──
 
@@ -270,43 +293,121 @@ app.delete('/api/nodes/pending/:token', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── 代理到节点 ──
+// ═══════════════════════════════════════════════════
+// API（隧道转发）
+// ═══════════════════════════════════════════════════
+// 以下路由接收浏览器请求，通过节点的 /link WebSocket 隧道发送请求并返回响应
 
-async function proxyToNode(nodeId: number, req: express.Request, res: express.Response): Promise<void> {
-  const node = getConnectedNode(nodeId);
-  if (!node) { res.status(404).json({ error: 'node not found or offline' }); return; }
-  const targetPath = req.originalUrl.replace(/^\/api\/node\/\d+/, '/api');
-  const targetUrl = `http://${node.address}:${node.port}${targetPath}`;
-  try {
-    const fetchOptions: RequestInit = {
-      method: req.method,
-      headers: { 'Content-Type': 'application/json' },
-    };
-    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'DELETE') {
-      fetchOptions.body = JSON.stringify(req.body);
-    }
-    const resp = await fetch(targetUrl, fetchOptions);
-    const ct = resp.headers.get('content-type') || '';
-    const data = ct.includes('application/json') ? await resp.json() : await resp.text();
-    res.status(resp.status).json(data);
-  } catch (e: any) {
-    res.status(502).json({ error: `proxy error: ${e.message}` });
+app.get('/api/node/:nodeId/instances', async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', '/api/instances')); }
+  catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+app.post('/api/node/:nodeId/instances', async (req, res) => {
+  try { res.status(201).json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', '/api/instances', req.body)); }
+  catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+app.put('/api/node/:nodeId/instances/:instanceId', async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'PUT', `/api/instances/${req.params.instanceId}`, req.body)); }
+  catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+app.delete('/api/node/:nodeId/instances/:instanceId', async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'DELETE', `/api/instances/${req.params.instanceId}`)); }
+  catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+app.post('/api/node/:nodeId/instances/:instanceId/start', async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', `/api/instances/${req.params.instanceId}/start`, req.body)); }
+  catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+app.post('/api/node/:nodeId/instances/:instanceId/stop', async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', `/api/instances/${req.params.instanceId}/stop`, req.body)); }
+  catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+app.get('/api/node/:nodeId/instances/:instanceId/status', async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', `/api/instances/${req.params.instanceId}/status`)); }
+  catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+app.get('/api/node/:nodeId/settings', async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', '/api/settings')); }
+  catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+app.put('/api/node/:nodeId/settings', async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'PUT', '/api/settings', req.body)); }
+  catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════
+// /link WebSocket：节点接入（不需要认证）
+// ═══════════════════════════════════════════════════
+
+/**
+ * 清理该节点的所有隧道状态
+ */
+function cleanupNodeState(nodeId: number): void {
+  // 拒绝该节点所有待处理的 API 请求
+  for (const [reqId, pending] of pendingApiRequests) {
+    clearTimeout(pending.timer);
+    pending.reject(new Error('Node disconnected'));
+    pendingApiRequests.delete(reqId);
+  }
+  // 关闭该节点的所有终端隧道
+  for (const [termId, browserWs] of terminalSessions) {
+    try { browserWs.close(); } catch { /* ignore */ }
+    terminalSessions.delete(termId);
+  }
+  // 关闭该节点的所有上传隧道
+  for (const [sessionId, browserWs] of uploadSessions) {
+    try { browserWs.close(); } catch { /* ignore */ }
+    uploadSessions.delete(sessionId);
   }
 }
 
-app.get('/api/node/:nodeId/instances', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
-app.post('/api/node/:nodeId/instances', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
-app.put('/api/node/:nodeId/instances/:instanceId', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
-app.delete('/api/node/:nodeId/instances/:instanceId', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
-app.post('/api/node/:nodeId/instances/:instanceId/start', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
-app.post('/api/node/:nodeId/instances/:instanceId/stop', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
-app.get('/api/node/:nodeId/instances/:instanceId/status', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
-app.get('/api/node/:nodeId/settings', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
-app.put('/api/node/:nodeId/settings', (req, res) => proxyToNode(parseInt(req.params.nodeId), req, res));
+/**
+ * 处理一条终端消息：从节点的 link WS 转发到浏览器 WS
+ */
+function handleTerminalMessage(msg: any): void {
+  if (msg.termId && terminalSessions.has(msg.termId)) {
+    const browserWs = terminalSessions.get(msg.termId)!;
+    if (browserWs.readyState === WebSocket.OPEN) {
+      if (msg.type === 'terminal_data') {
+        browserWs.send(msg.data);
+      } else if (msg.type === 'terminal_closed') {
+        browserWs.send('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+        setTimeout(() => browserWs.close(), 200);
+        terminalSessions.delete(msg.termId);
+      }
+    } else {
+      terminalSessions.delete(msg.termId);
+    }
+  }
+}
 
-// ═══════════════════════════════════════════════════
-// /link WebSocket: 节点接入（不需要认证）
-// ═══════════════════════════════════════════════════
+/**
+ * 处理一条上传消息：从节点的 link WS 转发到浏览器 WS
+ */
+function handleUploadMessage(msg: any): void {
+  const sessionId = msg.uploadSessionId;
+  if (!sessionId || !uploadSessions.has(sessionId)) return;
+  const browserWs = uploadSessions.get(sessionId)!;
+  if (browserWs.readyState !== WebSocket.OPEN) {
+    uploadSessions.delete(sessionId);
+    return;
+  }
+  // 转发时去除 uploadSessionId（浏览器层不需要感知）
+  const { uploadSessionId: _, ...forward } = msg;
+  browserWs.send(JSON.stringify(forward));
+  // 如果上传完成或失败，清掉状态
+  if (msg.type === 'upload_complete' || msg.type === 'upload_error') {
+    uploadSessions.delete(sessionId);
+  }
+}
 
 function handleLinkConnection(ws: WebSocket): void {
   let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -314,36 +415,75 @@ function handleLinkConnection(ws: WebSocket): void {
   ws.on('message', (raw) => {
     let msg: any;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
-    if (msg.type === 'register') {
-      const data = readNodes();
-      const pIdx = data.pendingTokens.findIndex((p: any) => p.token === msg.token);
-      const existing = data.nodes.find((n: any) => n.token === msg.token);
-      if (pIdx !== -1 || existing) {
-        const nodeName = pIdx !== -1 ? data.pendingTokens[pIdx].name : existing!.name;
-        if (pIdx !== -1) data.pendingTokens.splice(pIdx, 1);
-        const now = new Date().toISOString();
-        let nodeId: number;
-        if (existing) {
-          nodeId = existing.id;
-          existing.address = msg.address;
-          existing.port = msg.port || 6701;
-          existing.connected = true;
-          existing.lastSeen = now;
+
+    switch (msg.type) {
+
+      // ── 节点注册 ──
+      case 'register': {
+        const data = readNodes();
+        const pIdx = data.pendingTokens.findIndex((p: any) => p.token === msg.token);
+        const existing = data.nodes.find((n: any) => n.token === msg.token);
+        if (pIdx !== -1 || existing) {
+          const nodeName = pIdx !== -1 ? data.pendingTokens[pIdx].name : existing!.name;
+          if (pIdx !== -1) data.pendingTokens.splice(pIdx, 1);
+          const now = new Date().toISOString();
+          let nodeId: number;
+          if (existing) {
+            nodeId = existing.id;
+            existing.connected = true;
+            existing.lastSeen = now;
+            // 清理旧连接
+            const oldWs = nodeConnections.get(nodeId);
+            if (oldWs && oldWs !== ws) { try { oldWs.close(); } catch { /* ignore */ } }
+          } else {
+            nodeId = data.nodes.length;
+            data.nodes.push({ id: nodeId, name: nodeName, token: msg.token, connected: true, lastSeen: now });
+          }
+          writeNodes(data);
+          nodeConnections.set(nodeId, ws);
+          ws.send(JSON.stringify({ type: 'registered', nodeId }));
+          heartbeat = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
         } else {
-          nodeId = data.nodes.length;
-          data.nodes.push({ id: nodeId, name: nodeName, token: msg.token, address: msg.address, port: msg.port || 6701, connected: true, lastSeen: now });
+          ws.send(JSON.stringify({ type: 'error', message: 'invalid token' }));
+          setTimeout(() => ws.close(), 1000);
         }
-        writeNodes(data);
-        nodeConnections.set(nodeId, ws);
-        ws.send(JSON.stringify({ type: 'registered', nodeId }));
-        heartbeat = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
-      } else {
-        ws.send(JSON.stringify({ type: 'error', message: 'invalid token' }));
-        setTimeout(() => ws.close(), 1000);
+        break;
+      }
+
+      // ── API 响应 ──
+      case 'api_response': {
+        const pending = pendingApiRequests.get(msg.requestId);
+        if (pending) {
+          clearTimeout(pending.timer);
+          if (msg.status && msg.status >= 400) {
+            pending.reject(new Error(msg.error || `API error: ${msg.status}`));
+          } else {
+            pending.resolve(msg.data);
+          }
+          pendingApiRequests.delete(msg.requestId);
+        }
+        break;
+      }
+
+      // ── 终端数据（Node → Hub → Browser） ──
+      case 'terminal_data':
+      case 'terminal_closed': {
+        handleTerminalMessage(msg);
+        break;
+      }
+
+      // ── 文件上传（Node → Hub → Browser） ──
+      case 'upload_ack':
+      case 'upload_progress':
+      case 'upload_complete':
+      case 'upload_error': {
+        handleUploadMessage(msg);
+        break;
       }
     }
   });
 
+  // ── 断开清理 ──
   const cleanup = () => {
     if (heartbeat) clearInterval(heartbeat);
     const data = readNodes();
@@ -353,6 +493,7 @@ function handleLinkConnection(ws: WebSocket): void {
         const node = data.nodes.find(n => n.id === nodeId);
         if (node) { node.connected = false; changed = true; }
         nodeConnections.delete(nodeId);
+        cleanupNodeState(nodeId);
         break;
       }
     }
@@ -362,6 +503,12 @@ function handleLinkConnection(ws: WebSocket): void {
   ws.on('error', cleanup);
 }
 
+// ═══════════════════════════════════════════════════
+// WebSocket：终端代理 & 文件上传代理（需要 token 认证）
+// ═══════════════════════════════════════════════════
+// 浏览器连接到 Hub 的 /ws 或 /upload，
+// Hub 通过 /link 隧道将流量转发到对应的 Node
+
 /** 将任意数据转为字符串 */
 function bufToStr(data: any): string {
   if (typeof data === 'string') return data;
@@ -370,102 +517,107 @@ function bufToStr(data: any): string {
   return String(data);
 }
 
-/** 创建到目标节点的 WebSocket 代理 */
-function createNodeProxy(ws: WebSocket, nodeWsUrl: string, onMsg?: (msg: string) => string): void {
-  const nodeWs = new WebSocket(nodeWsUrl);
-  let nodeOpen = false;
-  let buffer: string[] = [];
-
-  nodeWs.on('open', () => {
-    nodeOpen = true;
-    for (const msg of buffer) { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.send(msg); }
-    buffer = [];
-  });
-
-  nodeWs.on('message', (data) => {
-    if (ws.readyState === WebSocket.OPEN) {
-      const msg = bufToStr(data);
-      ws.send(onMsg ? onMsg(msg) : msg);
-    }
-  });
-  nodeWs.on('close', () => { ws.close(); });
-  nodeWs.on('error', () => { ws.close(); });
-
-  ws.on('message', (raw) => {
-    const text = bufToStr(raw);
-    if (nodeOpen && nodeWs.readyState === WebSocket.OPEN) { nodeWs.send(text); }
-    else if (!nodeOpen) { buffer.push(text); }
-  });
-  ws.on('close', () => { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.close(); });
-  ws.on('error', () => { if (nodeWs.readyState === WebSocket.OPEN) nodeWs.close(); });
-}
-
-/** 验证令牌并返回节点信息 */
-function authenticateWs(parsed: URL): { token: string; nodeId: number } | null {
-  const token = parsed.searchParams.get('token');
-  if (!token || !sessions.has(token)) return null;
-  const nodeIdStr = parsed.searchParams.get('nodeId');
-  const nodeId = nodeIdStr ? parseInt(nodeIdStr, 10) : null;
-  if (nodeId === null || isNaN(nodeId)) return null;
-  return { token, nodeId };
-}
-
-// ═══════════════════════════════════════════════════
-// WebSocket: 终端代理 & 文件上传代理（需要 token 认证）
-// ═══════════════════════════════════════════════════
-
 wss.on('connection', (ws: WebSocket, req) => {
   const parsed = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
 
-  // /link 路径 → 节点接入（无需 token）
+  // /link → 节点接入（无需 token）
   if (parsed.pathname === '/link') {
     handleLinkConnection(ws);
     return;
   }
 
-  // ── 需要 token 认证 ──
-  const auth = authenticateWs(parsed);
-  if (!auth) {
+  // ── 验证 token ──
+  const token = parsed.searchParams.get('token');
+  const nodeIdStr = parsed.searchParams.get('nodeId');
+  const nodeId = nodeIdStr ? parseInt(nodeIdStr, 10) : null;
+  if (!token || !sessions.has(token) || nodeId === null || isNaN(nodeId)) {
     const isJson = parsed.pathname === '/upload';
-    if (isJson) {
-      ws.send(JSON.stringify({ type: 'upload_error', message: 'Authentication required' }));
-    } else {
-      ws.send('Authentication required.\r\n');
-    }
+    ws.send(isJson
+      ? JSON.stringify({ type: 'upload_error', message: 'Authentication required' })
+      : 'Authentication required.\r\n');
     ws.close();
     return;
   }
 
-  const node = getConnectedNode(auth.nodeId);
-  if (!node) {
+  const linkWs = nodeConnections.get(nodeId);
+  if (!linkWs || linkWs.readyState !== WebSocket.OPEN) {
     const isJson = parsed.pathname === '/upload';
-    if (isJson) {
-      ws.send(JSON.stringify({ type: 'upload_error', message: 'Node not found or offline' }));
-    } else {
-      ws.send('Node not found or offline.\r\n');
-    }
+    ws.send(isJson
+      ? JSON.stringify({ type: 'upload_error', message: 'Node not connected' })
+      : 'Node not connected.\r\n');
     ws.close();
     return;
   }
 
+  // ── 文件上传代理（通过隧道） ──
   if (parsed.pathname === '/upload') {
-    // ── 文件上传代理 ──
-    const nodeWsUrl = `ws://${node.address}:${node.port}/upload`;
-    console.log(`[proxy] upload: hub → node #${auth.nodeId}`);
-    createNodeProxy(ws, nodeWsUrl);
+    const uploadSessionId = crypto.randomUUID();
+    uploadSessions.set(uploadSessionId, ws);
+    console.log(`[tunnel] upload start: session=${uploadSessionId} node=#${nodeId}`);
 
-  } else {
-    // ── 终端代理（/ws） ──
-    const instanceIdStr = parsed.searchParams.get('instanceId');
-    const instanceId = instanceIdStr ? parseInt(instanceIdStr, 10) : null;
-    const nodeQuery = new URLSearchParams();
-    if (instanceId !== null && !isNaN(instanceId)) {
-      nodeQuery.set('instanceId', String(instanceId));
-    }
-    const nodeWsUrl = `ws://${node.address}:${node.port}/ws${nodeQuery.toString() ? '?' + nodeQuery.toString() : ''}`;
-    console.log(`[proxy] WS: hub → node #${auth.nodeId} ${nodeWsUrl}`);
-    createNodeProxy(ws, nodeWsUrl);
+    // 浏览器发来的上传消息 → 转发到节点隧道
+    ws.on('message', (raw) => {
+      const text = bufToStr(raw);
+      let msg: any;
+      try { msg = JSON.parse(text); } catch { return; }
+
+      // 加上 uploadSessionId 后发往节点
+      linkWs.send(JSON.stringify({ uploadSessionId, ...msg }));
+    });
+
+    // 清理
+    ws.on('close', () => {
+      // 通知节点上传取消
+      if (linkWs.readyState === WebSocket.OPEN) {
+        linkWs.send(JSON.stringify({ type: 'upload_cancel', uploadSessionId }));
+      }
+      uploadSessions.delete(uploadSessionId);
+    });
+    ws.on('error', () => { uploadSessions.delete(uploadSessionId); });
+    return;
   }
+
+  // ── 终端代理（通过隧道） ──
+  const instanceIdStr = parsed.searchParams.get('instanceId');
+  const instanceId = instanceIdStr ? parseInt(instanceIdStr, 10) : null;
+  const termId = crypto.randomUUID();
+
+  terminalSessions.set(termId, ws);
+  console.log(`[tunnel] terminal: termId=${termId} node=#${nodeId} instanceId=${instanceId}`);
+
+  // 通知节点创建终端
+  linkWs.send(JSON.stringify({
+    type: 'terminal_open',
+    termId,
+    instanceId: (instanceId !== null && !isNaN(instanceId)) ? instanceId : null,
+  }));
+
+  // 浏览器 → 节点
+  ws.on('message', (raw) => {
+    const text = bufToStr(raw);
+    // 检查是否 resize 控制消息
+    try {
+      const json = JSON.parse(text);
+      if (json.type === 'resize') {
+        linkWs.send(JSON.stringify({ type: 'terminal_resize', termId, cols: json.cols, rows: json.rows }));
+        return;
+      }
+    } catch { /* 不是 JSON，当作终端输入 */ }
+    linkWs.send(JSON.stringify({ type: 'terminal_data', termId, data: text }));
+  });
+
+  ws.on('close', () => {
+    if (linkWs.readyState === WebSocket.OPEN) {
+      linkWs.send(JSON.stringify({ type: 'terminal_close', termId }));
+    }
+    terminalSessions.delete(termId);
+  });
+  ws.on('error', () => {
+    if (linkWs.readyState === WebSocket.OPEN) {
+      linkWs.send(JSON.stringify({ type: 'terminal_close', termId }));
+    }
+    terminalSessions.delete(termId);
+  });
 });
 
 app.get('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only' }));

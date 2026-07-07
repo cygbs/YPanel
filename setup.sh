@@ -101,7 +101,7 @@ EOF
 
     # 获取节点连接参数
     echo "请从 hub 管理界面复制节点连接参数（以 -s 开头的一串参数）"
-    echo "示例: -s ws://192.168.0.232:6699/link -t 317ad2c9-... -p 6701"
+    echo "示例: -s ws://192.168.0.232:6699/link -t 317ad2c9-..."
     read -p "粘贴参数: " node_args
 
     if [ -z "$node_args" ]; then

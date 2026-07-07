@@ -47,7 +47,7 @@ fs.cpSync(path.join(ZIG_SRC, 'package.json'), path.join(ZIG_DST, 'package.json')
 
 console.log('  zigpty: dist + prebuilds copied');
 
-console.log('Node dist ready: run node dist-node/index.js -s <hub-url> -t <token> [-p <port>]');
+console.log('Node dist ready: run node dist-node/index.js -s <hub-url> -t <token>');
 console.log('');
 console.log('Example: node dist-node/index.js -s ws://localhost:6699/link -t YOUR_TOKEN');
 console.log('To start hub:  node dist/index.js');
