@@ -28,15 +28,7 @@ A web panel for Minecraft server.
 
 无论如何，先确保有Node.js环境。请[安装好Node.js环境](https://nodejs.org/zh-cn/download)。
 
-如果你的系统有systemd，**使用下面的命令一键安装：**
-
-```bash
-curl https://raw.githubusercontent.com/cygbs/YPanel/refs/heads/main/setup.sh | bash
-```
-
-请先按1配置`Hub`，然后新建节点并复制命令，按2再粘贴进去来配置`Node`，等待节点出现后关闭对话框即可。**绝对不要使用root权限运行安装脚本和面板！运行面板的账户最好保证权限最小化。**
-
-**手动：**
+**手动方式：**
 
 从[Releases](https://github.com/cygbs/YPanel/releases)下载`YPanel.zip`，解压之后，`dist`是`Hub`部分，`dist-node`是`Node`部分，需要配合使用。启动方法是`node index.js`。
 
@@ -52,6 +44,8 @@ curl https://raw.githubusercontent.com/cygbs/YPanel/refs/heads/main/setup.sh | b
 - 实现i18n。
 - 完善文档。
 - 提供一个简单明了的外部API，便于与其他程序联动。
+- 提供一键安装脚本。
+- 使用[Bubblewrap](https://github.com/containers/bubblewrap)提供容器功能，而不是Docker。这个面板不会支持Docker，因为作者认为它并不那么适合MC服务端。
 
 ## 许可证
 
