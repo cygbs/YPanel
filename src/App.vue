@@ -226,7 +226,7 @@
         <div class="dialog-body">
           <div class="node-token-label" style="margin-bottom:8px">在目标机器上运行以下命令：</div>
           <div class="token-cmd-box">
-            <code class="token-cmd-text">node index.js -s ws://{{ locationHost }}/link -t {{ generatedToken }}</code>
+            <code class="token-cmd-text">node index.js -s {{ wsHost }}/link -t {{ generatedToken }}</code>
           </div>
           <div class="token-cmd-note">节点连接后此窗口将自动关闭。</div>
         </div>
@@ -784,7 +784,8 @@ export default defineComponent({
     }
 
     function copyToken(): void {
-      const cmd = `node index.js -s ws://${window.location.host}/link -t ${generatedToken.value}`;
+      const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const cmd = `node index.js -s ${wsProto}//${window.location.host}/link -t ${generatedToken.value}`;
       navigator.clipboard.writeText(cmd).catch(() => {});
     }
 
@@ -1306,6 +1307,7 @@ export default defineComponent({
     const statusTimer = setInterval(() => pollStatus(), 10000);
 
     const locationHost = window.location.host;
+    const wsHost = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + locationHost;
 
     return {
       // 认证
@@ -1318,7 +1320,7 @@ export default defineComponent({
       // 节点管理
       nodes, pendingTokens, activeNodeId, activeNode,
       showNodeDialog, newNodeName, generatingNode,
-      generatedToken, generatedNodeName, showGeneratedToken, locationHost,
+      generatedToken, generatedNodeName, showGeneratedToken, locationHost, wsHost,
       nodeError,
       selectedNodeId, selectedNodeForMenu, selectNode,
       openNodeDialog, closeNodeDialog, generateNodeToken, copyToken,

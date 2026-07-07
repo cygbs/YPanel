@@ -371,11 +371,12 @@ interface PendingRequest {
   resolve: (value: any) => void;
   reject: (reason: any) => void;
   timer: NodeJS.Timeout;
+  nodeId: number;
 }
 const pendingApiRequests = new Map<string, PendingRequest>();
 
-const terminalSessions = new Map<string, WebSocket>();
-const uploadSessions = new Map<string, WebSocket>();
+const terminalSessions = new Map<string, { ws: WebSocket; nodeId: number }>();
+const uploadSessions = new Map<string, { ws: WebSocket; nodeId: number }>();
 
 function sendApiRequest(nodeId: number, method: string, path: string, body?: any): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -389,7 +390,7 @@ function sendApiRequest(nodeId: number, method: string, path: string, body?: any
       pendingApiRequests.delete(requestId);
       reject(new Error('Request timeout'));
     }, 30000);
-    pendingApiRequests.set(requestId, { resolve, reject, timer });
+    pendingApiRequests.set(requestId, { resolve, reject, timer, nodeId });
     linkWs.send(JSON.stringify({ type: 'api_request', requestId, method, path, body }));
   });
 }
@@ -532,23 +533,29 @@ app.put('/api/node/:nodeId/settings', mutationLimiter, async (req, res) => {
 
 function cleanupNodeState(nodeId: number): void {
   for (const [reqId, pending] of pendingApiRequests) {
-    clearTimeout(pending.timer);
-    pending.reject(new Error('Node disconnected'));
-    pendingApiRequests.delete(reqId);
+    if (pending.nodeId === nodeId) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error('Node disconnected'));
+      pendingApiRequests.delete(reqId);
+    }
   }
-  for (const [termId, browserWs] of terminalSessions) {
-    try { browserWs.close(); } catch { /* ignore */ }
-    terminalSessions.delete(termId);
+  for (const [termId, entry] of terminalSessions) {
+    if (entry.nodeId === nodeId) {
+      try { entry.ws.close(); } catch { /* ignore */ }
+      terminalSessions.delete(termId);
+    }
   }
-  for (const [sessionId, browserWs] of uploadSessions) {
-    try { browserWs.close(); } catch { /* ignore */ }
-    uploadSessions.delete(sessionId);
+  for (const [sessionId, entry] of uploadSessions) {
+    if (entry.nodeId === nodeId) {
+      try { entry.ws.close(); } catch { /* ignore */ }
+      uploadSessions.delete(sessionId);
+    }
   }
 }
 
 function handleTerminalMessage(msg: any): void {
   if (!msg.termId || !terminalSessions.has(msg.termId)) return;
-  const browserWs = terminalSessions.get(msg.termId)!;
+  const browserWs = terminalSessions.get(msg.termId)!.ws;
   if (browserWs.readyState !== WebSocket.OPEN) { terminalSessions.delete(msg.termId); return; }
   if (msg.type === 'terminal_data') {
     browserWs.send(msg.data);
@@ -562,7 +569,7 @@ function handleTerminalMessage(msg: any): void {
 function handleUploadMessage(msg: any): void {
   const sessionId = msg.uploadSessionId;
   if (!sessionId || !uploadSessions.has(sessionId)) return;
-  const browserWs = uploadSessions.get(sessionId)!;
+  const browserWs = uploadSessions.get(sessionId)!.ws;
   if (browserWs.readyState !== WebSocket.OPEN) { uploadSessions.delete(sessionId); return; }
   const { uploadSessionId: _, ...forward } = msg;
   browserWs.send(JSON.stringify(forward));
@@ -718,7 +725,7 @@ wss.on('connection', (ws: WebSocket, req) => {
   // ── 文件上传代理（通过隧道） ──
   if (parsed.pathname === '/upload') {
     const uploadSessionId = crypto.randomUUID();
-    uploadSessions.set(uploadSessionId, ws);
+    uploadSessions.set(uploadSessionId, { ws, nodeId });
     console.log(`[tunnel] upload start: session=${uploadSessionId} node=#${nodeId}`);
 
     ws.on('message', (raw) => {
@@ -743,7 +750,7 @@ wss.on('connection', (ws: WebSocket, req) => {
   const instanceId = instanceIdStr ? parseInt(instanceIdStr, 10) : null;
   const termId = crypto.randomUUID();
 
-  terminalSessions.set(termId, ws);
+  terminalSessions.set(termId, { ws, nodeId });
   console.log(`[tunnel] terminal: termId=${termId} node=#${nodeId} instanceId=${instanceId}`);
 
   linkWs.send(JSON.stringify({
