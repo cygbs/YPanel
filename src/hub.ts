@@ -23,6 +23,9 @@ import rateLimit from 'express-rate-limit';
 const BCRYPT_ROUNDS = 12;
 const SESSION_TTL_MS = 3 * 60 * 60 * 1000; // 3 小时
 
+// ── Cookie 名称 ──
+const SESSION_COOKIE_NAME = 'ypanel_session';
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({
@@ -31,7 +34,7 @@ const wss = new WebSocketServer({
   handleProtocols: (protocols) => protocols.values().next().value || false,
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // ── 路径解析（兼容 tsx 开发模式与 dist 构建模式） ──
 const ROOT_DIR = process.argv[1]?.endsWith('.ts')
@@ -123,6 +126,7 @@ function initAuth(): { password: string } {
 // ── Session Token 管理 ──
 interface SessionEntry {
   createdAt: number;
+  csrfToken: string;
 }
 const sessions = new Map<string, SessionEntry>();
 
@@ -138,10 +142,11 @@ function cleanExpiredSessions(): void {
 // 每分钟清理一次
 setInterval(cleanExpiredSessions, 60_000);
 
-function createToken(): string {
+function createSession(): { token: string; csrfToken: string } {
   const token = crypto.randomUUID();
-  sessions.set(token, { createdAt: Date.now() });
-  return token;
+  const csrfToken = crypto.randomUUID();
+  sessions.set(token, { createdAt: Date.now(), csrfToken });
+  return { token, csrfToken };
 }
 
 /** 验证 token 是否有效（含过期检查，请求时自动续期） */
@@ -159,6 +164,15 @@ function isValidToken(token: string): boolean {
 /** 删除 token（退出登录） */
 function revokeToken(token: string): void {
   sessions.delete(token);
+}
+
+/** 从 Cookie 头提取 session token */
+function getSessionCookie(req: http.IncomingMessage | express.Request): string | null {
+  const raw = req.headers.cookie;
+  if (!raw) return null;
+  const cookieStr = Array.isArray(raw) ? raw.join('; ') : raw;
+  const match = cookieStr.match(new RegExp(`\\b${SESSION_COOKIE_NAME}=([^;]+)`));
+  return match ? match[1] : null;
 }
 
 // ── 初始化认证（首次运行时生成） ──
@@ -210,6 +224,21 @@ const mutationLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/** 设置 session cookie（HttpOnly + SameSite=Strict，省略 Secure 以兼容 HTTP） */
+function setSessionCookie(res: express.Response, token: string): void {
+  res.cookie(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'strict',
+    maxAge: SESSION_TTL_MS,
+    path: '/',
+  });
+}
+
+/** 清除 session cookie */
+function clearSessionCookie(res: express.Response): void {
+  res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
+}
+
 /** 登录（仅需密码，用户名固定为 admin） */
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   try {
@@ -228,17 +257,18 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       auth.hash = result.newHash;
       writeAuth(auth);
     }
-    const token = createToken();
-    res.json({ token, defaultPassword: auth.defaultPassword });
+    const { token, csrfToken } = createSession();
+    setSessionCookie(res, token);
+    res.json({ csrfToken, defaultPassword: auth.defaultPassword });
   } catch (e) {
     console.error('Login error:', e);
     res.status(500).json({ error: '内部错误' });
   }
 });
 
-/** 验证 token 状态 */
+/** 验证 session 状态 */
 app.post('/api/auth/check', (req, res) => {
-  const { token } = req.body;
+  const token = getSessionCookie(req);
   if (token && isValidToken(token)) {
     const auth = readAuth();
     res.json({ valid: true, defaultPassword: auth?.defaultPassword ?? false });
@@ -247,11 +277,19 @@ app.post('/api/auth/check', (req, res) => {
   }
 });
 
-/** 修改密码（需携带有效 token，需旧密码） */
+/** 返回当前 session 的 CSRF Token */
+app.get('/api/auth/csrf-token', (req, res) => {
+  const token = getSessionCookie(req);
+  if (!token) { res.status(401).json({ error: 'unauthorized' }); return; }
+  const entry = sessions.get(token);
+  if (!entry || !isValidToken(token)) { res.status(401).json({ error: 'session expired' }); return; }
+  res.json({ csrfToken: entry.csrfToken });
+});
+
+/** 修改密码（需携带有效 session cookie，需旧密码） */
 app.post('/api/auth/change-password', changePasswordLimiter, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    const token = getSessionCookie(req);
     if (!token || !isValidToken(token)) {
       res.status(401).json({ error: 'unauthorized' });
       return;
@@ -283,23 +321,43 @@ app.post('/api/auth/change-password', changePasswordLimiter, async (req, res) =>
   }
 });
 
-/** 退出登录 */
+/** 退出登录：清除 cookie 和服务端 session */
 app.post('/api/auth/logout', (req, res) => {
-  const { token } = req.body;
+  const token = getSessionCookie(req);
   if (token) revokeToken(token);
+  clearSessionCookie(res);
   res.json({ ok: true });
 });
 
 // ═══════════════════════════════════════════════════
 // 认证中间件（保护 /api/* 路由，除 /api/auth/* 外）
+// 从 HttpOnly Cookie 读取 session，不再使用 Bearer 头
 // ═══════════════════════════════════════════════════
 
 app.use('/api', (req, res, next) => {
   if (req.path.startsWith('/auth/')) { next(); return; }
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const token = getSessionCookie(req);
   if (token && isValidToken(token)) { next(); return; }
   res.status(401).json({ error: 'authentication required' });
+});
+
+// ═══════════════════════════════════════════════════
+// CSRF 中间件（保护 /api/* 的写操作，除 /api/auth/* 外）
+// ═══════════════════════════════════════════════════
+
+app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/auth/')) { next(); return; }
+  if (!['POST', 'PUT', 'DELETE'].includes(req.method)) { next(); return; }
+  const token = getSessionCookie(req);
+  if (!token) { res.status(401).json({ error: 'authentication required' }); return; }
+  const entry = sessions.get(token);
+  if (!entry) { res.status(401).json({ error: 'session expired' }); return; }
+  const csrfHeader = req.headers['x-csrf-token'];
+  if (!csrfHeader || csrfHeader !== entry.csrfToken) {
+    res.status(403).json({ error: 'invalid CSRF token' });
+    return;
+  }
+  next();
 });
 
 // ═══════════════════════════════════════════════════
@@ -601,7 +659,8 @@ function handleLinkConnection(ws: WebSocket): void {
 // WebSocket：终端代理 & 文件上传代理
 // ═══════════════════════════════════════════════════
 // 浏览器连接到 Hub 的 /ws 或 /upload，
-// 认证通过 Sec-WebSocket-Protocol 头传递（不在 URL 中），
+// 认证优先通过 HttpOnly Cookie 读取 session，
+// fallback 到 Sec-WebSocket-Protocol 头（向后兼容），
 // Hub 通过 /link 隧道将流量转发到对应的 Node
 
 function bufToStr(data: any): string {
@@ -611,8 +670,12 @@ function bufToStr(data: any): string {
   return String(data);
 }
 
-/** 从 WebSocket 握手请求中提取认证 token（优先子协议头） */
+/** 从 WebSocket 握手请求中提取认证 token（优先 HttpOnly Cookie，fallback Sec-WebSocket-Protocol） */
 function extractWsToken(req: http.IncomingMessage): string | null {
+  // 优先 HttpOnly Cookie
+  const cookieToken = getSessionCookie(req);
+  if (cookieToken) return cookieToken;
+  // fallback：Sec-WebSocket-Protocol（向后兼容）
   const proto = req.headers['sec-websocket-protocol'];
   if (proto) {
     return Array.isArray(proto) ? proto[0] : proto;

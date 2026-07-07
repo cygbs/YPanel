@@ -484,15 +484,18 @@
 import { defineComponent, reactive, ref, computed, watch } from 'vue';
 import TerminalTab from './TerminalTab.vue';
 
-/** 带认证的 fetch */
-function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const token = localStorage.getItem('ypanel_token');
-  const headers = { ...(options.headers || {}) } as Record<string, string>;
-  if (token) headers['Authorization'] = 'Bearer ' + token;
-  return fetch(url, { ...options, headers });
-}
+// ── CSRF Token（运行时内存，不自 localStorage） ──
+let _csrfToken: string | null = null;
 
-const AUTH_TOKEN_KEY = 'ypanel_token';
+/** 带认证的 fetch（Cookie 自动发送，CSRF Token 由本函数添加） */
+function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const headers = { ...(options.headers || {}) } as Record<string, string>;
+  const method = (options.method || 'GET').toUpperCase();
+  if (['POST', 'PUT', 'DELETE'].includes(method) && _csrfToken) {
+    headers['X-CSRF-Token'] = _csrfToken;
+  }
+  return fetch(url, { ...options, headers, credentials: 'same-origin' });
+}
 
 interface TabData {
   id: number;
@@ -546,23 +549,25 @@ export default defineComponent({
     const changingPassword = ref(false);
 
     async function checkAuth(): Promise<void> {
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
-      if (!token) { authState.value = 'login'; return; }
       try {
         const res = await fetch('/api/auth/check', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
+          credentials: 'same-origin',
         });
         const data = await res.json();
         if (data.valid) {
+          // 同步获取 CSRF Token
+          const csrfRes = await fetch('/api/auth/csrf-token', { credentials: 'same-origin' });
+          if (csrfRes.ok) {
+            const csrfData = await csrfRes.json();
+            _csrfToken = csrfData.csrfToken;
+          }
           if (data.defaultPassword) {
             authState.value = 'change-password';
           } else {
             authState.value = 'authenticated';
           }
         } else {
-          localStorage.removeItem(AUTH_TOKEN_KEY);
           authState.value = 'login';
         }
       } catch {
@@ -576,11 +581,12 @@ export default defineComponent({
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ password: loginPassword.value }),
         });
         const data = await res.json();
         if (res.ok) {
-          localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+          _csrfToken = data.csrfToken;
           if (data.defaultPassword) {
             authState.value = 'change-password';
           } else {
@@ -604,10 +610,10 @@ export default defineComponent({
       }
       changingPassword.value = true;
       try {
-        const token = localStorage.getItem(AUTH_TOKEN_KEY);
         const res = await fetch('/api/auth/change-password', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ oldPassword: loginPassword.value, newPassword: changeNewPassword.value }),
         });
         const data = await res.json();
@@ -624,11 +630,10 @@ export default defineComponent({
       try {
         await fetch('/api/auth/logout', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: localStorage.getItem(AUTH_TOKEN_KEY) }),
+          credentials: 'same-origin',
         });
       } catch { /* ignore */ }
-      localStorage.removeItem(AUTH_TOKEN_KEY);
+      _csrfToken = null;
       authState.value = 'login';
       loginPassword.value = '';
       loginError.value = '';
@@ -1217,10 +1222,9 @@ export default defineComponent({
       uploadTotal.value = file.size;
 
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
       const params = `nodeId=${activeNodeId.value}`;
-      // 认证 token 通过 Sec-WebSocket-Protocol 头传递，不在 URL 中
-      uploadWs = new WebSocket(`${protocol}//${location.host}/upload?${params}`, token ? [token] : undefined);
+      // 认证：HttpOnly Cookie 由浏览器自动发送
+      uploadWs = new WebSocket(`${protocol}//${location.host}/upload?${params}`);
 
       uploadWs.onopen = () => {
         // 发送开始消息
