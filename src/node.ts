@@ -361,8 +361,8 @@ function handleTerminalOpen(ws: WebSocket, msg: any): void {
       const str = ptyDataToStr(data);
       entry.outputBuffer.push(str);
       if (entry.outputBuffer.length > 2000) entry.outputBuffer.shift();
-      for (const tid of entry.wsTermIds) {
-        sendToHub({ type: 'terminal_data', tid, data: str });
+      for (const termId of entry.wsTermIds) {
+        sendToHub({ type: 'terminal_data', termId, data: str });
       }
     });
     shell.onExit(() => { managedProcesses.delete(instanceId); });
@@ -381,8 +381,8 @@ function handleTerminalOpen(ws: WebSocket, msg: any): void {
     };
     shell.onData((data: string | Buffer) => {
       const str = ptyDataToStr(data);
-      for (const tid of entry.wsTermIds) {
-        sendToHub({ type: 'terminal_data', tid, data: str });
+      for (const termId of entry.wsTermIds) {
+        sendToHub({ type: 'terminal_data', termId, data: str });
       }
     });
     shell.onExit(() => { managedProcesses.delete(unmanagedId); });
