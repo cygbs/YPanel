@@ -594,9 +594,7 @@ function extractWsToken(req: http.IncomingMessage): string | null {
   if (proto) {
     return Array.isArray(proto) ? proto[0] : proto;
   }
-  // 回退：URL query（兼容旧版客户端）
-  const parsed = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
-  return parsed.searchParams.get('token');
+  return null;
 }
 
 wss.on('connection', (ws: WebSocket, req) => {

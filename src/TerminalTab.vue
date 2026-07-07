@@ -96,9 +96,7 @@ export default defineComponent({
         params.set('nodeId', String(props.nodeId));
       }
 
-      // 追加认证 token
       const token = localStorage.getItem('ypanel_token');
-      if (token) params.set('token', token);
 
       const wsPath = params.toString() ? `/ws?${params.toString()}` : '';
       const wsUrl = wsPath ? `${protocol}//${location.host}${wsPath}` : null;
@@ -108,7 +106,7 @@ export default defineComponent({
         return;
       }
 
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(wsUrl, token ? [token] : undefined);
 
       // IME
       let isComposing = false;
