@@ -21,7 +21,7 @@ import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 
 const BCRYPT_ROUNDS = 12;
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 小时
+const SESSION_TTL_MS = 3 * 60 * 60 * 1000; // 3 小时
 
 const app = express();
 const server = http.createServer(app);
@@ -144,7 +144,7 @@ function createToken(): string {
   return token;
 }
 
-/** 验证 token 是否有效（含过期检查） */
+/** 验证 token 是否有效（含过期检查，请求时自动续期） */
 function isValidToken(token: string): boolean {
   const entry = sessions.get(token);
   if (!entry) return false;
@@ -152,6 +152,7 @@ function isValidToken(token: string): boolean {
     sessions.delete(token);
     return false;
   }
+  entry.createdAt = Date.now();
   return true;
 }
 
@@ -182,6 +183,28 @@ const loginLimiter = rateLimit({
   max: 10,
   handler: (_req, res) => {
     res.status(429).json({ error: '登录尝试过于频繁，请 15 分钟后再试' });
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/** 修改密码频率限制：15 分钟内最多 5 次尝试 */
+const changePasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  handler: (_req, res) => {
+    res.status(429).json({ error: '修改密码尝试过于频繁，请 15 分钟后再试' });
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/** 通用写入操作频率限制：15 分钟内最多 30 次请求 */
+const mutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  handler: (_req, res) => {
+    res.status(429).json({ error: '请求过于频繁，请稍后再试' });
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -225,7 +248,7 @@ app.post('/api/auth/check', (req, res) => {
 });
 
 /** 修改密码（需携带有效 token，需旧密码） */
-app.post('/api/auth/change-password', async (req, res) => {
+app.post('/api/auth/change-password', changePasswordLimiter, async (req, res) => {
   try {
     const authHeader = req.headers.authorization || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -351,7 +374,7 @@ function writeNodes(data: NodesData): void {
 
 app.get('/api/nodes', (_req, res) => { res.json(readNodes()); });
 
-app.post('/api/nodes', (req, res) => {
+app.post('/api/nodes', mutationLimiter, (req, res) => {
   const { name } = req.body;
   const data = readNodes();
   const token = crypto.randomUUID();
@@ -361,7 +384,7 @@ app.post('/api/nodes', (req, res) => {
   res.json({ token, nodeName });
 });
 
-app.delete('/api/nodes/:id', (req, res) => {
+app.delete('/api/nodes/:id', mutationLimiter, (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
   const data = readNodes();
@@ -374,7 +397,7 @@ app.delete('/api/nodes/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-app.put('/api/nodes/:id', (req, res) => {
+app.put('/api/nodes/:id', mutationLimiter, (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
   const data = readNodes();
@@ -387,7 +410,7 @@ app.put('/api/nodes/:id', (req, res) => {
   res.json(node);
 });
 
-app.delete('/api/nodes/pending/:token', (req, res) => {
+app.delete('/api/nodes/pending/:token', mutationLimiter, (req, res) => {
   const data = readNodes();
   const idx = data.pendingTokens.findIndex(p => p.token === req.params.token);
   if (idx === -1) { res.status(404).json({ error: 'token not found' }); return; }
@@ -405,27 +428,27 @@ app.get('/api/node/:nodeId/instances', async (req, res) => {
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
 });
 
-app.post('/api/node/:nodeId/instances', async (req, res) => {
+app.post('/api/node/:nodeId/instances', mutationLimiter, async (req, res) => {
   try { res.status(201).json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', '/api/instances', req.body)); }
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
 });
 
-app.put('/api/node/:nodeId/instances/:instanceId', async (req, res) => {
+app.put('/api/node/:nodeId/instances/:instanceId', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'PUT', `/api/instances/${req.params.instanceId}`, req.body)); }
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
 });
 
-app.delete('/api/node/:nodeId/instances/:instanceId', async (req, res) => {
+app.delete('/api/node/:nodeId/instances/:instanceId', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'DELETE', `/api/instances/${req.params.instanceId}`)); }
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
 });
 
-app.post('/api/node/:nodeId/instances/:instanceId/start', async (req, res) => {
+app.post('/api/node/:nodeId/instances/:instanceId/start', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', `/api/instances/${req.params.instanceId}/start`, req.body)); }
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
 });
 
-app.post('/api/node/:nodeId/instances/:instanceId/stop', async (req, res) => {
+app.post('/api/node/:nodeId/instances/:instanceId/stop', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', `/api/instances/${req.params.instanceId}/stop`, req.body)); }
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
 });
@@ -440,7 +463,7 @@ app.get('/api/node/:nodeId/settings', async (req, res) => {
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
 });
 
-app.put('/api/node/:nodeId/settings', async (req, res) => {
+app.put('/api/node/:nodeId/settings', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'PUT', '/api/settings', req.body)); }
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
 });
@@ -707,7 +730,7 @@ function readHubSettings(): { listenPort: number } {
 }
 
 app.get('/api/settings', (_req, res) => res.json(readHubSettings()));
-app.put('/api/settings', (req, res) => {
+app.put('/api/settings', mutationLimiter, (req, res) => {
   const { listenPort } = req.body;
   const s = readHubSettings();
   if (listenPort !== undefined) s.listenPort = listenPort;

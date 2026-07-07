@@ -457,6 +457,10 @@ function handleUploadStart(msg: any): void {
   }
 
   const userPath = (uploadPath || '').trim();
+  if (userPath.includes('..')) {
+    sendToHub({ type: 'upload_error', uploadSessionId, message: '上传路径不能包含 ..' });
+    return;
+  }
   const baseDir = userPath
     ? path.resolve(userPath.replace(/^~/, os.homedir()))
     : os.homedir();
