@@ -44,12 +44,60 @@ const ROOT_DIR = process.argv[1]?.endsWith('.ts')
 const PUBLIC_DIR = process.argv[1]?.endsWith('.ts')
   ? path.resolve(ROOT_DIR, 'dist', 'public')
   : path.join(ROOT_DIR, 'public');
+// ── 安全入口中间件 ──
+// 若设置了安全入口（非空且非 /），用户必须先访问该入口路径才能使用面板
+// 访问入口路径后会设置 bypass cookie 并重定向到 /
+app.use((req, res, next) => {
+  const settings = readHubSettings();
+  const entry = settings.securityEntry?.trim();
+
+  // 未设置安全入口，放行
+  if (!entry || entry === '/') {
+    next();
+    return;
+  }
+
+  const pathname = req.path;
+
+  // 尝试 URL 解码（非 ASCII 入口路径浏览器会编码后发送）
+  let decodedPathname: string;
+  try { decodedPathname = decodeURIComponent(pathname); } catch { decodedPathname = pathname; }
+
+  // 匹配安全入口路径 → 设置 bypass cookie 并跳转到 /
+  if (pathname === entry || pathname === entry + '/' ||
+      decodedPathname === entry || decodedPathname === entry + '/') {
+    const token = crypto.randomUUID();
+    securityBypassTokens.add(token);
+    res.cookie(SECURITY_BYPASS_COOKIE, token, {
+      httpOnly: true,
+      sameSite: 'strict',
+      secure: req.secure,
+      maxAge: 60 * 60 * 1000, // 1 小时
+      path: '/',
+    });
+    res.redirect('/');
+    return;
+  }
+
+  // 有有效的 bypass cookie → 放行
+  const bypassToken = getCookie(req, SECURITY_BYPASS_COOKIE);
+  if (bypassToken && securityBypassTokens.has(bypassToken)) {
+    next();
+    return;
+  }
+
+  // 一律返回 404
+  const content = settings.securityContent || defaultHubSettings().securityContent;
+  res.status(404).type('html').send(content);
+});
+
 app.use(express.static(PUBLIC_DIR));
 
 // ── 数据存储 ──
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const NODES_FILE = path.join(DATA_DIR, 'nodes.json');
 const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
+const HUB_SETTINGS_FILE = path.join(DATA_DIR, 'hub-settings.json');
 
 function ensureDataDir(): void {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -102,6 +150,34 @@ function writeAuth(data: AuthData): void {
   fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+// ═══════════════════════════════════════════════════
+// Hub 设置（安全入口等）
+// ═══════════════════════════════════════════════════
+
+interface HubSettings {
+  securityEntry: string;
+  securityContent: string;
+}
+
+function defaultHubSettings(): HubSettings {
+  return {
+    securityEntry: '',
+    securityContent: '<!DOCTYPE html>\n<html lang="en">\n<head><title>404 Not Found</title></head>\n<body>\n<center><h1>404 Not Found</h1></center>\n<hr><center>nginx</center>\n</body>\n</html>',
+  };
+}
+
+function readHubSettings(): HubSettings {
+  ensureDataDir();
+  if (!fs.existsSync(HUB_SETTINGS_FILE)) return defaultHubSettings();
+  try { return JSON.parse(fs.readFileSync(HUB_SETTINGS_FILE, 'utf-8')); }
+  catch { return defaultHubSettings(); }
+}
+
+function writeHubSettings(data: HubSettings): void {
+  ensureDataDir();
+  fs.writeFileSync(HUB_SETTINGS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
+
 /** 首次运行：生成随机密码 */
 function initAuth(): { password: string } {
   const password = randomPassword();
@@ -152,14 +228,23 @@ function revokeToken(token: string): void {
   sessions.delete(token);
 }
 
-/** 从 Cookie 头提取 session token */
-function getSessionCookie(req: http.IncomingMessage | express.Request): string | null {
+/** 从 Cookie 头提取指定名称的 cookie 值 */
+function getCookie(req: http.IncomingMessage | express.Request, name: string): string | null {
   const raw = req.headers.cookie;
   if (!raw) return null;
   const cookieStr = Array.isArray(raw) ? raw.join('; ') : raw;
-  const match = cookieStr.match(new RegExp(`\\b${SESSION_COOKIE_NAME}=([^;]+)`));
+  const match = cookieStr.match(new RegExp(`\\b${name}=([^;]+)`));
   return match ? match[1] : null;
 }
+
+/** 从 Cookie 头提取 session token */
+function getSessionCookie(req: http.IncomingMessage | express.Request): string | null {
+  return getCookie(req, SESSION_COOKIE_NAME);
+}
+
+// ── 安全入口 bypass 令牌 ──
+const SECURITY_BYPASS_COOKIE = 'ypanel_security';
+const securityBypassTokens = new Set<string>();
 
 // ── 初始化认证（首次运行时生成） ──
 let firstRunCreds: { password: string } | null = null;
@@ -309,6 +394,38 @@ app.post('/api/auth/logout', (req, res) => {
   if (token) revokeToken(token);
   clearSessionCookie(req, res);
   res.json({ ok: true });
+});
+
+// ═══════════════════════════════════════════════════
+// API: Hub 设置（安全入口等）
+// ═══════════════════════════════════════════════════
+
+app.get('/api/hub-settings', (req, res) => {
+  res.json(readHubSettings());
+});
+
+app.put('/api/hub-settings', mutationLimiter, (req, res) => {
+  const { securityEntry, securityContent } = req.body;
+  const s = readHubSettings();
+  const oldEntry = s.securityEntry;
+
+  if (securityEntry !== undefined) {
+    let entry = String(securityEntry).trim();
+    if (!entry.startsWith('/')) entry = '/' + entry;
+    s.securityEntry = entry;
+  }
+  if (securityContent !== undefined) {
+    s.securityContent = String(securityContent);
+  }
+
+  writeHubSettings(s);
+
+  // 安全入口变更时清空所有已有 bypass token
+  if (s.securityEntry !== oldEntry) {
+    securityBypassTokens.clear();
+  }
+
+  res.json(s);
 });
 
 // ═══════════════════════════════════════════════════

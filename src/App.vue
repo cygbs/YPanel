@@ -76,6 +76,7 @@
           </template>
           <template v-else>
             <button @click="openNodeDialog">新增节点…</button>
+            <button @click="openHubSettings">设置</button>
           </template>
           <button>帮助</button>
           <button @click="doLogout" class="qa-back" style="margin-left:auto">退出登录</button>
@@ -394,6 +395,42 @@
           <button class="btn btn-secondary" @click="closeSettings">取消</button>
           <button class="btn btn-primary" :disabled="savingSettings" @click="saveSettings">
             {{ savingSettings ? '保存中…' : '保存' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Hub 设置对话框 ===== -->
+    <div v-if="showHubSettings" class="dialog-overlay" @click.self="closeHubSettings">
+      <div class="dialog">
+        <div class="dialog-title">Hub 设置</div>
+        <div class="dialog-body">
+          <label class="field">
+            <span class="field-label">安全入口</span>
+            <div class="input-with-prefix">
+              <span class="input-prefix">/</span>
+              <input
+                v-model="hubSecurityEntry"
+                type="text"
+                class="input prefix-input"
+                placeholder="留空则无安全入口"
+              />
+            </div>
+            <span class="field-hint">设置后访问 /{{ hubSecurityEntry }} 才可进入面板，其余路径返回 404</span>
+          </label>
+          <label class="field">
+            <span class="field-label">返回内容</span>
+            <textarea
+              v-model="hubSecurityContent"
+              class="textarea"
+              rows="10"
+            ></textarea>
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" @click="closeHubSettings">取消</button>
+          <button class="btn btn-primary" :disabled="savingHubSettings" @click="saveHubSettings">
+            {{ savingHubSettings ? '保存中…' : '保存' }}
           </button>
         </div>
       </div>
@@ -1150,6 +1187,50 @@ export default defineComponent({
       }
     }
 
+    // ── Hub 设置（安全入口等） ──
+    const showHubSettings = ref(false);
+    const hubSecurityEntry = ref('');
+    const hubSecurityContent = ref('');
+    const savingHubSettings = ref(false);
+
+    async function openHubSettings(): Promise<void> {
+      try {
+        const res = await apiFetch('/api/hub-settings');
+        if (res.ok) {
+          const data = await res.json();
+          // 安全入口：去掉开头的 / 以便在 input-with-prefix 中显示
+          const entry = data.securityEntry || '';
+          hubSecurityEntry.value = entry.startsWith('/') ? entry.slice(1) : entry;
+          hubSecurityContent.value = data.securityContent || '';
+        }
+      } catch { /* ignore */ }
+      showHubSettings.value = true;
+    }
+
+    function closeHubSettings(): void {
+      showHubSettings.value = false;
+    }
+
+    async function saveHubSettings(): Promise<void> {
+      savingHubSettings.value = true;
+      try {
+        const entry = '/' + hubSecurityEntry.value;
+        await apiFetch('/api/hub-settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            securityEntry: entry,
+            securityContent: hubSecurityContent.value,
+          }),
+        });
+        showHubSettings.value = false;
+      } catch (e) {
+        console.error('Failed to save hub settings', e);
+      } finally {
+        savingHubSettings.value = false;
+      }
+    }
+
     // ── 文件上传 ──
     const CHUNK_SIZE = 64 * 1024; // 64KB
     const showUploadDialog = ref(false);
@@ -1333,6 +1414,10 @@ export default defineComponent({
       openTerminal, openEditInstance,
       openSettings, closeSettings, saveSettings,
       openDeleteConfirm, confirmDelete, cancelDelete,
+      // Hub 设置
+      showHubSettings, hubSecurityEntry, hubSecurityContent,
+      savingHubSettings,
+      openHubSettings, closeHubSettings, saveHubSettings,
       // 文件上传
       showUploadDialog, uploadFile, uploadPath,
       uploadStatus, uploadProgress, uploadReceived, uploadTotal,

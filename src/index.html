@@ -507,6 +507,52 @@
       color: #888;
       font-weight: normal;
     }
+    .input-with-prefix {
+      display: flex;
+      align-items: center;
+      height: 34px;
+      background: #12122a;
+      border: 1px solid #2a2a4a;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .input-with-prefix:focus-within {
+      border-color: #6272a4;
+    }
+    .input-prefix {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      flex-shrink: 0;
+      color: #777;
+      font-size: 14px;
+      font-family: Menlo, Monaco, 'Courier New', monospace;
+      user-select: none;
+    }
+    .prefix-input {
+      flex: 1;
+      border: none !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+    }
+    .textarea {
+      width: 100%;
+      padding: 10px;
+      background: #12122a;
+      border: 1px solid #2a2a4a;
+      border-radius: 5px;
+      color: #e0e0e0;
+      font-size: 12px;
+      font-family: Menlo, Monaco, 'Courier New', monospace;
+      outline: none;
+      resize: vertical;
+      line-height: 1.5;
+      transition: border-color 0.15s;
+    }
+    .textarea:focus {
+      border-color: #6272a4;
+    }
     .input:disabled {
       opacity: 0.4;
       cursor: not-allowed;
