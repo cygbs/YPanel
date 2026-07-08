@@ -770,7 +770,22 @@ wss.on('connection', (ws: WebSocket, req) => {
 app.get('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only' }));
 app.post('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only' }));
 
+// ═══════════════════════════════════════════════════
+// 全局错误处理（阻止 body parser 堆栈泄漏）
+// ═══════════════════════════════════════════════════
 
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err.type === 'entity.parse.failed') {
+    res.status(400).json({ error: 'Invalid JSON' });
+    return;
+  }
+  if (err.type === 'entity.too.large') {
+    res.status(413).json({ error: 'Request body too large' });
+    return;
+  }
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 // ═══════════════════════════════════════════════════
 // 启动
