@@ -79,9 +79,7 @@ app.use((req, res, next) => {
     return;
   }
 
-  // 有有效的 bypass cookie → 放行
-  const bypassToken = getCookie(req, SECURITY_BYPASS_COOKIE);
-  if (bypassToken && securityBypassTokens.has(bypassToken)) {
+  if (isSecurityEntryBypassed(req)) {
     next();
     return;
   }
@@ -245,6 +243,15 @@ function getSessionCookie(req: http.IncomingMessage | express.Request): string |
 // ── 安全入口 bypass 令牌 ──
 const SECURITY_BYPASS_COOKIE = 'ypanel_security';
 const securityBypassTokens = new Set<string>();
+
+/** 检查客户端是否已绕过安全入口 */
+function isSecurityEntryBypassed(req: http.IncomingMessage): boolean {
+  const settings = readHubSettings();
+  const entry = settings.securityEntry?.trim();
+  if (!entry || entry === '/') return true;
+  const bypassToken = getCookie(req, SECURITY_BYPASS_COOKIE);
+  return !!(bypassToken && securityBypassTokens.has(bypassToken));
+}
 
 // ── 初始化认证（首次运行时生成） ──
 let firstRunCreds: { password: string } | null = null;
@@ -795,6 +802,13 @@ wss.on('connection', (ws: WebSocket, req) => {
   // /link → 节点接入（无需 token）
   if (parsed.pathname === '/link') {
     handleLinkConnection(ws);
+    return;
+  }
+
+  // ── 安全入口检查 ──
+  // 设置安全入口后，未绕过入口的 WS 连接静默关闭，不透露任何信息
+  if (!isSecurityEntryBypassed(req)) {
+    ws.close();
     return;
   }
 
