@@ -1071,7 +1071,7 @@ export default defineComponent({
       const prefix = apiPrefix();
       runningStates[inst.id] = 'stopping';
       await apiFetch(prefix + '/instances/' + inst.id + '/stop', { method: 'POST' });
-      setTimeout(() => pollStatus(), 3000);
+      // Hub 会推送 instance_status 事件，不用 setTimeout 去轮询
     }
 
     function validate(): boolean {
@@ -1123,8 +1123,7 @@ export default defineComponent({
             const created = await res.json();
             instances.value.push(created);
             closeNewDialog();
-            // 立即查一次新实例的状态
-            pollStatus();
+            // Hub 会推送 instances_refresh + instance_status 事件
           }
         }
       } catch (e) {
@@ -1428,6 +1427,7 @@ export default defineComponent({
         case 'instances_refresh': {
           if (activeNodeId.value === msg.nodeId) {
             loadInstances();
+            pollStatus(); // 新实例的绿点需要立即查
           }
           break;
         }
