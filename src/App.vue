@@ -93,6 +93,7 @@
                 class="instance-card"
                 :class="{ selected: node.id === selectedNodeId }"
                 @click="selectNode(node.id)"
+                @dblclick="switchToNode(node.id)"
               >
                 <div class="inst-icon-wrap">
                   <img class="inst-icon" :src="'/assets/instances/' + (node.icon || 'gear.svg')" :alt="node.name" />
@@ -132,6 +133,7 @@
                 class="instance-card"
                 :class="{ selected: inst.id === selectedInstance?.id }"
                 @click="selectInstance(inst.id)"
+                @dblclick="openTerminal()"
               >
                 <div class="inst-icon-wrap">
                   <img class="inst-icon" :src="'/assets/instances/' + (inst.icon || 'grass.svg')" :alt="inst.name" />
@@ -600,6 +602,7 @@ export default defineComponent({
             authState.value = 'change-password';
           } else {
             authState.value = 'authenticated';
+            loadNodes(); // 已登录用户，立即拉取节点列表
           }
         } else {
           authState.value = 'login';
@@ -625,6 +628,7 @@ export default defineComponent({
             authState.value = 'change-password';
           } else {
             authState.value = 'authenticated';
+            await loadNodes(); // 立即加载节点列表，不等 events WS
           }
         } else {
           loginError.value = data.error || '登录失败';
@@ -653,6 +657,7 @@ export default defineComponent({
         const data = await res.json();
         if (res.ok) {
           authState.value = 'authenticated';
+          await loadNodes(); // 立即加载节点列表
         } else {
           changeError.value = data.error || '修改失败';
         }
@@ -1031,7 +1036,6 @@ export default defineComponent({
         const data = await res.json();
         if (data.status === 'started' || data.status === 'already_running') {
           runningStates[inst.id] = 'running';
-          openTerminalForInstance(inst);
         }
       } catch (e) {
         console.error('start error:', e);

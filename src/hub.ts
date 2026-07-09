@@ -991,6 +991,14 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // 启动
 // ═══════════════════════════════════════════════════
 
+// ── Hub 启动时重置节点状态 ──
+// 上次关闭时记录的 connected=true 已过时，节点会在 5 秒内重连
+const startupNodes = readNodes();
+for (const node of startupNodes.nodes) {
+  node.connected = false;
+}
+writeNodes(startupNodes);
+
 const PORT = parseInt(process.env.PORT || '6699', 10);
 server.listen(PORT, () => {
   console.log(`YPanel Hub running on http://localhost:${PORT}`);
