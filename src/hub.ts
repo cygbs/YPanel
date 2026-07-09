@@ -36,7 +36,6 @@ const wss = new WebSocketServer({
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
-app.use(express.json({ limit: '1mb' }));
 
 // ── 路径解析（兼容 tsx 开发模式与 dist 构建模式） ──
 const ROOT_DIR = process.argv[1]?.endsWith('.ts')
@@ -89,6 +88,8 @@ app.use((req, res, next) => {
   const content = settings.securityContent || defaultHubSettings().securityContent;
   res.status(404).type('html').send(content);
 });
+
+app.use(express.json({ limit: '1mb' }));
 
 app.use(express.static(PUBLIC_DIR));
 
