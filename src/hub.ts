@@ -31,7 +31,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({
   server,
   clientTracking: false,
-  handleProtocols: (protocols) => protocols.values().next().value || false,
+  // handleProtocols 不设，由 ws 库默认处理
 });
 
 app.disable('x-powered-by');
@@ -773,8 +773,7 @@ function handleLinkConnection(ws: WebSocket): void {
 // WebSocket：终端代理 & 文件上传代理
 // ═══════════════════════════════════════════════════
 // 浏览器连接到 Hub 的 /ws 或 /upload，
-// 认证优先通过 HttpOnly Cookie 读取 session，
-// fallback 到 Sec-WebSocket-Protocol 头（向后兼容），
+// 认证仅通过 HttpOnly Cookie 读取 session，
 // Hub 通过 /link 隧道将流量转发到对应的 Node
 
 function bufToStr(data: any): string {
@@ -784,17 +783,10 @@ function bufToStr(data: any): string {
   return String(data);
 }
 
-/** 从 WebSocket 握手请求中提取认证 token（优先 HttpOnly Cookie，fallback Sec-WebSocket-Protocol） */
+/** 从 WebSocket 握手请求中提取认证 token（仅 HttpOnly Cookie） */
 function extractWsToken(req: http.IncomingMessage): string | null {
-  // 优先 HttpOnly Cookie
-  const cookieToken = getSessionCookie(req);
-  if (cookieToken) return cookieToken;
-  // fallback：Sec-WebSocket-Protocol（向后兼容）
-  const proto = req.headers['sec-websocket-protocol'];
-  if (proto) {
-    return Array.isArray(proto) ? proto[0] : proto;
-  }
-  return null;
+  // 仅从 HttpOnly Cookie 读取，不支持自定协议头
+  return getSessionCookie(req);
 }
 
 wss.on('connection', (ws: WebSocket, req) => {
@@ -813,7 +805,7 @@ wss.on('connection', (ws: WebSocket, req) => {
     return;
   }
 
-  // ── 验证 token（从 Sec-WebSocket-Protocol 头获取） ──
+  // ── 验证 token（从 HttpOnly Cookie 获取） ──
   const token = extractWsToken(req);
   const nodeIdStr = parsed.searchParams.get('nodeId');
   const nodeId = nodeIdStr ? parseInt(nodeIdStr, 10) : null;

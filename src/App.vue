@@ -836,10 +836,11 @@ export default defineComponent({
       } catch { /* ignore */ }
     }
 
-    function switchToNode(id: number): void {
+    async function switchToNode(id: number): Promise<void> {
       activeNodeId.value = id;
       showNodeDialog.value = false;
-      loadInstances();
+      await loadInstances();
+      pollStatus(); // 实例列表已加载，立即查一次状态，不等定时器
     }
 
     function leaveNode(): void {
@@ -991,7 +992,7 @@ export default defineComponent({
             }
           }
         }
-      } catch { /* ignore */ }
+      } catch (e) { console.warn('loadInstances failed:', e); }
     }
 
     async function pollStatus(): Promise<void> {
@@ -1012,7 +1013,7 @@ export default defineComponent({
               runningStates[inst.id] = false;
             }
           }
-        } catch { /* ignore */ }
+        } catch (e) { console.warn(`pollStatus #${inst.id} failed:`, e); }
       }
     }
 
@@ -1121,6 +1122,8 @@ export default defineComponent({
             const created = await res.json();
             instances.value.push(created);
             closeNewDialog();
+            // 立即查一次新实例的状态
+            pollStatus();
           }
         }
       } catch (e) {
@@ -1179,6 +1182,7 @@ export default defineComponent({
         const res = await apiFetch(prefix + '/instances/' + id, { method: 'DELETE' });
         if (res.ok) {
           instances.value = instances.value.filter((i) => i.id !== id);
+          delete runningStates[id];
           selectedId.value = null;
           showDeleteConfirm.value = false;
         }
@@ -1381,6 +1385,9 @@ export default defineComponent({
     loadNodes();
     const nodesTimer = setInterval(() => loadNodes(), 5000);
     const statusTimer = setInterval(() => pollStatus(), 10000);
+    const instancesTimer = setInterval(() => {
+      if (activeNodeId.value !== null) loadInstances();
+    }, 15000);
 
     const locationHost = window.location.host;
     const wsHost = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + locationHost;
