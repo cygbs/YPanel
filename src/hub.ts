@@ -474,11 +474,19 @@ app.use('/api', (req, res, next) => {
 /** 节点连接池：nodeId → /link WebSocket */
 const nodeConnections = new Map<number, WebSocket>();
 
+/** 浏览器事件推送客户端 */
+const browserEventClients = new Set<WebSocket>();
+
+/** Node WebSocket → nodeId 反向映射 */
+const wsToNodeId = new Map<WebSocket, number>();
+
 interface PendingRequest {
   resolve: (value: any) => void;
   reject: (reason: any) => void;
   timer: NodeJS.Timeout;
   nodeId: number;
+  method: string;
+  path: string;
 }
 const pendingApiRequests = new Map<string, PendingRequest>();
 
@@ -497,7 +505,7 @@ function sendApiRequest(nodeId: number, method: string, path: string, body?: any
       pendingApiRequests.delete(requestId);
       reject(new Error('Request timeout'));
     }, 30000);
-    pendingApiRequests.set(requestId, { resolve, reject, timer, nodeId });
+    pendingApiRequests.set(requestId, { resolve, reject, timer, nodeId, method, path });
     linkWs.send(JSON.stringify({ type: 'api_request', requestId, method, path, body }));
   });
 }
@@ -714,8 +722,10 @@ function handleLinkConnection(ws: WebSocket): void {
           }
           writeNodes(data);
           nodeConnections.set(nodeId, ws);
+          wsToNodeId.set(ws, nodeId);
           ws.send(JSON.stringify({ type: 'registered', nodeId }));
           heartbeat = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
+          broadcastEvent({ type: 'nodes', nodes: readNodes() });
         } else {
           ws.send(JSON.stringify({ type: 'error', message: 'invalid token' }));
           setTimeout(() => ws.close(), 1000);
@@ -730,6 +740,19 @@ function handleLinkConnection(ws: WebSocket): void {
             pending.reject(new Error(msg.error || `API error: ${msg.status}`));
           } else {
             pending.resolve(msg.data);
+            // ── 根据 API 路径广播状态变更 ──
+            const p = pending.path;
+            const sMatch = p.match(/\/api\/instances\/(\d+)\/(start|stop)$/);
+            if (sMatch) {
+              broadcastEvent({
+                type: 'instance_status',
+                nodeId: pending.nodeId,
+                instanceId: parseInt(sMatch[1]),
+                running: sMatch[2] === 'start',
+              });
+            } else if (['POST', 'PUT', 'DELETE'].includes(pending.method) && p.startsWith('/api/instances')) {
+              broadcastEvent({ type: 'instances_refresh', nodeId: pending.nodeId });
+            }
           }
           pendingApiRequests.delete(msg.requestId);
         }
@@ -738,6 +761,15 @@ function handleLinkConnection(ws: WebSocket): void {
       case 'terminal_data':
       case 'terminal_closed': {
         handleTerminalMessage(msg);
+        break;
+      }
+      case 'node_status': {
+        const nid = wsToNodeId.get(ws);
+        if (nid !== undefined && Array.isArray(msg.instances)) {
+          for (const st of msg.instances) {
+            broadcastEvent({ type: 'instance_status', nodeId: nid, instanceId: st.instanceId, running: true });
+          }
+        }
         break;
       }
       case 'upload_ack':
@@ -763,10 +795,48 @@ function handleLinkConnection(ws: WebSocket): void {
         break;
       }
     }
-    if (changed) writeNodes(data);
+    if (changed) {
+      writeNodes(data);
+      broadcastEvent({ type: 'nodes', nodes: readNodes() });
+    }
   };
   ws.on('close', cleanup);
   ws.on('error', cleanup);
+}
+
+/** 向所有浏览器客户端广播事件 */
+function broadcastEvent(event: any): void {
+  const msg = JSON.stringify(event);
+  for (const ws of browserEventClients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(msg);
+    }
+  }
+}
+
+/** 向单个浏览器客户端发送事件 */
+function sendEvent(ws: WebSocket, event: any): void {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(event));
+  }
+}
+
+/** 处理浏览器事件推送连接 */
+function handleEventsConnection(ws: WebSocket, req: http.IncomingMessage): void {
+  // 安全入口检查
+  if (!isSecurityEntryBypassed(req)) { ws.close(); return; }
+
+  // Session 检查
+  const token = getSessionCookie(req);
+  if (!token || !isValidToken(token)) { ws.close(); return; }
+
+  browserEventClients.add(ws);
+
+  // 发送完整初始状态
+  sendEvent(ws, { type: 'nodes', nodes: readNodes() });
+
+  ws.on('close', () => browserEventClients.delete(ws));
+  ws.on('error', () => browserEventClients.delete(ws));
 }
 
 // ═══════════════════════════════════════════════════
@@ -795,6 +865,12 @@ wss.on('connection', (ws: WebSocket, req) => {
   // /link → 节点接入（无需 token）
   if (parsed.pathname === '/link') {
     handleLinkConnection(ws);
+    return;
+  }
+
+  // /events → 浏览器事件订阅
+  if (parsed.pathname === '/events') {
+    handleEventsConnection(ws, req);
     return;
   }
 

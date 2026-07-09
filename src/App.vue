@@ -661,6 +661,7 @@ export default defineComponent({
     }
 
     async function doLogout(): Promise<void> {
+      disconnectEvents();
       try {
         await fetch('/api/auth/logout', {
           method: 'POST',
@@ -1381,13 +1382,69 @@ export default defineComponent({
       };
     }
 
+    // ── 事件推送连接 ──
+    let eventsWs: WebSocket | null = null;
+    let eventsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function disconnectEvents(): void {
+      if (eventsWs) { eventsWs.close(); eventsWs = null; }
+      if (eventsReconnectTimer) { clearTimeout(eventsReconnectTimer); eventsReconnectTimer = null; }
+    }
+
+    function connectEvents(): void {
+      if (eventsWs && (eventsWs.readyState === WebSocket.OPEN || eventsWs.readyState === WebSocket.CONNECTING)) return;
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      eventsWs = new WebSocket(`${protocol}//${location.host}/events`);
+      eventsWs.onopen = () => { /* connected */ };
+      eventsWs.onmessage = (ev) => {
+        try { handleEventMsg(JSON.parse(ev.data)); } catch { /* ignore */ }
+      };
+      eventsWs.onclose = () => {
+        eventsWs = null;
+        if (authState.value === 'authenticated') {
+          eventsReconnectTimer = setTimeout(connectEvents, 5000);
+        }
+      };
+      eventsWs.onerror = () => eventsWs?.close();
+    }
+
+    function handleEventMsg(msg: any): void {
+      switch (msg.type) {
+        case 'nodes': {
+          const d = msg.nodes;
+          nodes.value = d.nodes || [];
+          pendingTokens.value = d.pendingTokens || [];
+          if (activeNodeId.value !== null && !nodes.value.find((n: any) => n.id === activeNodeId.value)) {
+            activeNodeId.value = null;
+          }
+          break;
+        }
+        case 'instance_status': {
+          if (activeNodeId.value === msg.nodeId) {
+            runningStates[msg.instanceId] = msg.running ? 'running' : false;
+          }
+          break;
+        }
+        case 'instances_refresh': {
+          if (activeNodeId.value === msg.nodeId) {
+            loadInstances();
+          }
+          break;
+        }
+      }
+    }
+
     // ── 初始化 ──
     loadNodes();
-    const nodesTimer = setInterval(() => loadNodes(), 5000);
-    const statusTimer = setInterval(() => pollStatus(), 10000);
-    const instancesTimer = setInterval(() => {
-      if (activeNodeId.value !== null) loadInstances();
-    }, 15000);
+    watch(authState, (state) => {
+      if (state === 'authenticated') {
+        connectEvents();
+      } else {
+        disconnectEvents();
+      }
+    });
+    // 页面加载时若已登录，手动连接
+    if (authState.value === 'authenticated') connectEvents();
 
     const locationHost = window.location.host;
     const wsHost = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + locationHost;

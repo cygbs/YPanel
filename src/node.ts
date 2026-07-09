@@ -552,6 +552,7 @@ function cleanupAllState(): void {
 
 function autoStartInstances(): void {
   const data = readInstances();
+  const started: { instanceId: number }[] = [];
   for (const inst of data.instances) {
     if (inst.autoStart && !managedProcesses.has(inst.id)) {
       try {
@@ -560,8 +561,13 @@ function autoStartInstances(): void {
         pty.write(`cd "${inst.folder}"\r`);
         pty.write(`${inst.command}\r`);
         console.log(`  auto-start: #${inst.id} ${inst.name}`);
+        started.push({ instanceId: inst.id });
       } catch { /* skip failed spawn */ }
     }
+  }
+  // auto-start 完成后再上报，确保 sendToHub 已就绪
+  if (started.length > 0) {
+    setTimeout(() => sendToHub({ type: 'node_status', instances: started }), 1000);
   }
 }
 
@@ -587,6 +593,14 @@ function connectToHub(): void {
     switch (msg.type) {
       case 'registered':
         console.log(`Registered with hub as node #${msg.nodeId}`);
+        // 上报当前正在运行的实例
+        const runningInstances: { instanceId: number }[] = [];
+        for (const [id] of managedProcesses) {
+          if (id >= 0) runningInstances.push({ instanceId: id });
+        }
+        if (runningInstances.length > 0) {
+          sendToHub({ type: 'node_status', instances: runningInstances });
+        }
         break;
       case 'error':
         console.error(`Hub error: ${msg.message}`);
