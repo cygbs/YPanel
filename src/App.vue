@@ -603,7 +603,17 @@ const AVAILABLE_ICONS = [
 ];
 
 function generateUUID(): string {
-  return crypto.randomUUID();
+  try {
+    return crypto.randomUUID();
+  } catch {
+    // crypto.randomUUID 仅在 HTTPS 或 localhost 下可用
+    // HTTP 局域网访问时 fallback 到 Math.random 方案
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
 }
 
 let nextTabId = 1;
@@ -885,13 +895,37 @@ export default defineComponent({
     function copyToken(): void {
       const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const cmd = `node index.js -s ${wsProto}//${window.location.host}/link -t ${generatedToken.value}`;
-      navigator.clipboard.writeText(cmd).then(
-        () => {
+
+      // clipboard API 仅在 HTTPS 或 localhost 下可用
+      // HTTP 局域网访问时 fallback 到选中文本 + execCommand 方案
+      function fallbackCopy(text: string): void {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
           showNotification(t('notification.copy_success'), 'success');
           showGeneratedToken.value = false;
-        },
-        () => {}
-      );
+        } catch {
+          // 什么都不做
+        }
+        document.body.removeChild(textarea);
+      }
+
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(cmd).then(
+          () => {
+            showNotification(t('notification.copy_success'), 'success');
+            showGeneratedToken.value = false;
+          },
+          () => fallbackCopy(cmd)
+        );
+      } else {
+        fallbackCopy(cmd);
+      }
     }
 
 
@@ -1517,7 +1551,8 @@ export default defineComponent({
     }
 
     // ── 初始化 ──
-    loadNodes();
+    // authState 初始为 'loading'，无需在此处调用 loadNodes()
+    // checkAuth() 在认证通过后会自动加载节点列表
     watch(authState, (state) => {
       if (state === 'authenticated') {
         connectEvents();
