@@ -60,7 +60,9 @@ instances:
   select_hint: Select an instance
   start: Start
   stop: Stop
+  force_stop: Force Stop
   open_terminal: Open Terminal
+  start_first: Please start the instance first.
   edit: Edit
   delete: Delete Instance
 

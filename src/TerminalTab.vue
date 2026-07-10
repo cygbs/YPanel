@@ -18,6 +18,7 @@ export default defineComponent({
     nodeId: { type: Number, default: null },
   },
   setup(props, { expose }) {
+    const { t } = useI18n();
     const terminalRef = ref<HTMLElement | null>(null);
     let terminal: Terminal | null = null;
     let fitAddon: FitAddon | null = null;
@@ -101,8 +102,7 @@ export default defineComponent({
       const wsUrl = wsPath ? `${protocol}//${location.host}${wsPath}` : null;
 
       if (!wsUrl) {
-        const { t } = useI18n();
-      terminal.write(t('terminal.unavailable') + '\r\n');
+        terminal.write(t('terminal.unavailable') + '\r\n');
         return;
       }
 

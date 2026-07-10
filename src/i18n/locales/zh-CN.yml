@@ -60,7 +60,9 @@ instances:
   select_hint: 选择一个实例
   start: 启动
   stop: 停止
+  force_stop: 强制停止
   open_terminal: 打开终端
+  start_first: 请先启动实例。
   edit: 编辑
   delete: 删除实例
 

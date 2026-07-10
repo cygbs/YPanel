@@ -60,7 +60,9 @@ instances:
   select_hint: 選擇一個實例
   start: 啟動
   stop: 停止
+  force_stop: 強制停止
   open_terminal: 開啟終端機
+  start_first: 請先啟動實例。
   edit: 編輯
   delete: 刪除實例
 

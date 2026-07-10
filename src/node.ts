@@ -100,7 +100,10 @@ function registerProcess(
       sendToHub({ type: 'terminal_data', termId: tid, data: str });
     }
   });
-  pty.onExit(() => { managedProcesses.delete(instanceId); });
+  pty.onExit(() => {
+    managedProcesses.delete(instanceId);
+    sendToHub({ type: 'process_exited', instanceId });
+  });
   managedProcesses.set(instanceId, entry);
   return entry;
 }
@@ -284,6 +287,7 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
 
       pty.onExit(() => {
         managedProcesses.delete(id);
+        sendToHub({ type: 'process_exited', instanceId: id });
       });
 
       managedProcesses.set(id, entry);
@@ -306,11 +310,20 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
       } else {
         mp.pty.write(stopCmd + '\r');
       }
-      setTimeout(() => {
-        const mp2 = managedProcesses.get(id);
-        if (mp2) { mp2.pty.kill(); managedProcesses.delete(id); }
-      }, 3000);
+      // 不设置超时强制杀死，让用户手动决定何时强制停止
       respond(200, { status: 'stop_sent' });
+      return;
+    }
+
+    // ── /api/instances/:id/force-stop ──
+    if (parts.length === 4 && parts[0] === 'api' && parts[1] === 'instances' && parts[3] === 'force-stop') {
+      const id = parseInt(parts[2], 10);
+      if (isNaN(id)) { respondError(400, 'invalid id'); return; }
+      const mp = managedProcesses.get(id);
+      if (!mp) { respond(200, { status: 'not_running' }); return; }
+      mp.pty.kill();
+      managedProcesses.delete(id);
+      respond(200, { status: 'force_stopped' });
       return;
     }
 

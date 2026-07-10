@@ -153,8 +153,19 @@
                 </div>
                 <div class="fm-name">{{ selectedInstance.name }}</div>
                 <div class="fm-actions">
-                  <button class="fm-btn" @click="startInstance">{{ $t('instances.start') }}</button>
-                  <button class="fm-btn" @click="stopInstance">{{ $t('instances.stop') }}</button>
+                  <button
+                    class="fm-btn"
+                    :disabled="selectedInstance ? !!runningStates[selectedInstance.id] : true"
+                    @click="startInstance"
+                  >{{ $t('instances.start') }}</button>
+                  <button
+                    class="fm-btn"
+                    :class="{ 'btn-warning': selectedInstance && stopRequested[selectedInstance.id] }"
+                    :disabled="selectedInstance ? !runningStates[selectedInstance.id] && !stopRequested[selectedInstance.id] : true"
+                    @click="stopInstance"
+                  >
+                    {{ selectedInstance && stopRequested[selectedInstance.id] ? $t('instances.force_stop') : $t('instances.stop') }}
+                  </button>
                   <button class="fm-btn" @click="openTerminal">{{ $t('instances.open_terminal') }}</button>
                   <button class="fm-btn" @click="openEditInstance">{{ $t('instances.edit') }}</button>
                   <button class="fm-btn fm-btn-danger" @click="openDeleteConfirm">{{ $t('instances.delete') }}</button>
@@ -946,6 +957,7 @@ export default defineComponent({
       instances.value.find((i) => i.id === selectedId.value) ?? null
     );
     const runningStates = reactive<Record<number, 'running' | 'stopping' | false>>({});
+    const stopRequested = reactive<Record<number, boolean>>({});
     const showNewDialog = ref(false);
     const isEditing = ref(false);
     const editingId = ref<number | null>(null);
@@ -1060,6 +1072,7 @@ export default defineComponent({
               }
             } else {
               runningStates[inst.id] = false;
+              delete stopRequested[inst.id];
             }
           }
         } catch (e) { console.warn(`pollStatus #${inst.id} failed:`, e); }
@@ -1109,16 +1122,29 @@ export default defineComponent({
     function openTerminal(): void {
       const inst = selectedInstance.value;
       if (!inst) return;
-      openTerminalForInstance(inst);
+      // 实例运行中、或正在等待停止（橙色按钮状态）时允许打开终端
+      if (runningStates[inst.id] === 'running' || stopRequested[inst.id]) {
+        openTerminalForInstance(inst);
+      } else {
+        showNotification(t('instances.start_first'), 'error');
+      }
     }
 
     async function stopInstance(): Promise<void> {
       const inst = selectedInstance.value;
       if (!inst || activeNodeId.value === null) return;
       const prefix = apiPrefix();
-      runningStates[inst.id] = 'stopping';
-      await apiFetch(prefix + '/instances/' + inst.id + '/stop', { method: 'POST' });
-      // Hub 会推送 instance_status 事件，不用 setTimeout 去轮询
+
+      if (stopRequested[inst.id]) {
+        // 第二次点击：强制终止进程
+        runningStates[inst.id] = 'stopping';
+        await apiFetch(prefix + '/instances/' + inst.id + '/force-stop', { method: 'POST' });
+      } else {
+        // 第一次点击：发送用户配置的停止命令，不设超时强制杀死
+        stopRequested[inst.id] = true;
+        runningStates[inst.id] = 'stopping';
+        await apiFetch(prefix + '/instances/' + inst.id + '/stop', { method: 'POST' });
+      }
     }
 
     function validate(): boolean {
@@ -1474,6 +1500,9 @@ export default defineComponent({
         case 'instance_status': {
           if (activeNodeId.value === msg.nodeId) {
             runningStates[msg.instanceId] = msg.running ? 'running' : false;
+            if (!msg.running) {
+              delete stopRequested[msg.instanceId];
+            }
           }
           break;
         }
@@ -1599,7 +1628,7 @@ function dblclickNode(node: any): void {
       openLangDialog, closeLangDialog, setLang,
       // 实例管理
       instances, selectedInstance, selectedId, selectInstance,
-      runningStates, showNewDialog, isEditing, isEditingLocked,
+      runningStates, stopRequested, showNewDialog, isEditing, isEditingLocked,
       showNodeIconPicker, showInstanceIconPicker, showSettings, savingSettings, saving,
       settings, errors, showDeleteConfirm, newData,
       openNewInstance, closeNewDialog, selectIcon,

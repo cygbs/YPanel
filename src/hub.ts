@@ -632,6 +632,11 @@ app.post('/api/node/:nodeId/instances/:instanceId/stop', mutationLimiter, async 
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
 });
 
+app.post('/api/node/:nodeId/instances/:instanceId/force-stop', mutationLimiter, async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', `/api/instances/${req.params.instanceId}/force-stop`, req.body)); }
+  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+});
+
 app.get('/api/node/:nodeId/instances/:instanceId/status', async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', `/api/instances/${req.params.instanceId}/status`)); }
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
@@ -739,7 +744,7 @@ function handleLinkConnection(ws: WebSocket): void {
             pending.resolve(msg.data);
             // ── 根据 API 路径广播状态变更 ──
             const p = pending.path;
-            const sMatch = p.match(/\/api\/instances\/(\d+)\/(start|stop)$/);
+            const sMatch = p.match(/\/api\/instances\/(\d+)\/(start|force-stop)$/);
             if (sMatch) {
               broadcastEvent({
                 type: 'instance_status',
@@ -766,6 +771,13 @@ function handleLinkConnection(ws: WebSocket): void {
           for (const st of msg.instances) {
             broadcastEvent({ type: 'instance_status', nodeId: nid, instanceId: st.instanceId, running: true });
           }
+        }
+        break;
+      }
+      case 'process_exited': {
+        const nid = wsToNodeId.get(ws);
+        if (nid !== undefined) {
+          broadcastEvent({ type: 'instance_status', nodeId: nid, instanceId: msg.instanceId, running: false });
         }
         break;
       }

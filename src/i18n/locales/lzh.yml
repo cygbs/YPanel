@@ -60,7 +60,9 @@ instances:
   select_hint: 請擇一實例
   start: 啟
   stop: 止
+  force_stop: 強止
   open_terminal: 啟終端
+  start_first: 請先啟實例。
   edit: 編
   delete: 刪實例
 
