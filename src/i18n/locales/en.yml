@@ -1,0 +1,164 @@
+# YPanel English locale
+# Organized by UI section, matching zh-CN.yml keys
+
+name: English
+
+# ── Common ──
+loading: Loading…
+save: Save
+saving: Saving…
+cancel: Cancel
+close: Close
+network_error: Network error
+
+# ── Login ──
+login:
+  title: YPanel
+  subtitle: Please log in
+  password: Password
+  login: Log in
+  failed: Login failed
+
+# ── Change Default Password ──
+change_password:
+  title: Change Default Password
+  new_password: New password
+  confirm_password: Confirm password
+  mismatch: Passwords do not match
+  empty: Password cannot be empty
+  failed: Change failed
+
+# ── Tabs ──
+tab:
+  home: Home
+  new: New Tab
+  terminal: Terminal {id}
+
+# ── Quick Actions ──
+quick:
+  new_instance: New Instance
+  upload_file: Upload File…
+  settings: Settings
+  back_to_nodes: Back to Nodes
+  add_node: Add Node…
+  hub_settings: Settings
+  help: Help
+  logout: Log out
+
+# ── Nodes ──
+nodes:
+  none: No nodes yet. Click "Add Node…" to create one.
+  select_hint: Select a node
+  switch: Switch
+  edit: Edit
+  delete: Delete
+
+# ── Instances ──
+instances:
+  none: No instances on this node. Click "New Instance" to add one.
+  select_hint: Select an instance
+  start: Start
+  stop: Stop
+  open_terminal: Open Terminal
+  edit: Edit
+  delete: Delete Instance
+
+# ── Add Node Dialog ──
+add_node:
+  title: Add Node
+  name_placeholder: Node name (optional)
+  generate: Generate Token
+  generating: Generating…
+  failed: Failed to generate token
+
+# ── Token Dialog ──
+token_dialog:
+  title: New Node 「{name}」
+  command_hint: "Run the following command on the target machine:"
+  auto_close: This window will close automatically when the node connects.
+  copy: Copy Command
+
+# ── Edit Node ──
+edit_node:
+  title: Edit Node
+  name: Node Name
+  icon: Node Icon
+
+# ── Delete Node Confirm ──
+delete_node:
+  title: Delete this node?
+  body: The node will be disconnected and will need to re-register.
+  confirm: Delete
+
+# ── Instance Form ──
+instance_form:
+  title_create: New Instance
+  title_edit: Edit Instance
+  name: Instance Name
+  name_placeholder: What should we call it?
+  uuid: Instance UUID
+  icon: Instance Icon
+  command: Start Command
+  command_lock: (Stop the instance to modify)
+  folder: Instance Folder
+  folder_lock: (Stop the instance to modify)
+  stop_command: Stop Method
+  auto_start: Auto-start?
+  create: Create
+  required: This field is required.
+
+# ── Delete Instance ──
+delete_instance:
+  title: Delete this instance?
+  body: If the instance is running, it will be forcibly stopped. Deleting from the panel will not remove its data folder.
+  cancel: Cancel
+  confirm: Delete
+
+# ── Node Settings ──
+node_settings:
+  title: Settings — {name}
+  default_shell: Default Shell
+  shell_placeholder: Leave empty for auto-detect
+
+# ── Hub Settings ──
+hub_settings:
+  title: Hub Settings
+  security_entry: Security Entry
+  entry_hint: After setting, access /{entry} to enter the panel. Other paths return 404.
+  entry_placeholder: Leave empty for no security entry
+  security_content: Response Content
+
+# ── File Upload ──
+upload:
+  title: Upload File
+  dropzone_hint: Click to select or drag a file here
+  file: File
+  size: Size
+  path_hint: Upload path (leave empty for home directory)
+  path_placeholder: Leave empty to upload to home directory
+  uploading: Uploading… {received} / {total}
+  complete: Upload complete
+  failed: Upload failed
+  connection_failed: Connection failed
+  connection_lost: Connection lost
+  close: Close
+  cancel: Cancel
+  upload: Upload
+  done: Done
+
+# ── Terminal ──
+terminal:
+  unavailable: Terminal unavailable (no node specified).
+  connection_closed: '[Connection closed]'
+  connection_error: '[Connection error]'
+
+# ── Language ──
+lang:
+  label: English
+  title: Languages
+  select: Select Language
+
+# ── Notification ──
+notification:
+  node_offline: Node disconnected.
+  copy_success: Copied.

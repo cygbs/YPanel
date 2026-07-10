@@ -1,0 +1,164 @@
+# YPanel 中文（简体）语言文件
+# 按 UI 区域分组，便于维护
+
+name: 中文（简体）
+
+# ── 通用 ──
+loading: 正在加载…
+save: 保存
+saving: 保存中…
+cancel: 取消
+close: 关闭
+network_error: 网络错误
+
+# ── 登录 ──
+login:
+  title: YPanel
+  subtitle: 请登录
+  password: 密码
+  login: 登录
+  failed: 登录失败
+
+# ── 修改默认密码 ──
+change_password:
+  title: 请修改默认密码
+  new_password: 新密码
+  confirm_password: 重复新密码
+  mismatch: 两次输入的密码不一致
+  empty: 密码不能为空
+  failed: 修改失败
+
+# ── 标签页 ──
+tab:
+  home: 主页
+  new: 新标签页
+  terminal: 终端 {id}
+
+# ── 快捷操作栏 ──
+quick:
+  new_instance: 新建实例
+  upload_file: 上传文件…
+  settings: 设置
+  back_to_nodes: 返回节点列表
+  add_node: 新增节点…
+  hub_settings: 设置
+  help: 帮助
+  logout: 退出登录
+
+# ── 节点列表 ──
+nodes:
+  none: 暂无节点，点击「新增节点…」创建
+  select_hint: 选择一个节点
+  switch: 切换
+  edit: 编辑
+  delete: 删除
+
+# ── 实例列表 ──
+instances:
+  none: 该节点暂无实例，点击「新建实例」添加
+  select_hint: 选择一个实例
+  start: 启动
+  stop: 停止
+  open_terminal: 打开终端
+  edit: 编辑
+  delete: 删除实例
+
+# ── 新增节点对话框 ──
+add_node:
+  title: 新增节点
+  name_placeholder: 节点名称（可选）
+  generate: 生成 Token
+  generating: 生成中…
+  failed: 生成 Token 失败
+
+# ── Token 命令对话框 ──
+token_dialog:
+  title: 新节点「{name}」
+  command_hint: 在目标机器上运行以下命令：
+  auto_close: 节点连接后此窗口将自动关闭。
+  copy: 复制命令
+
+# ── 编辑节点 ──
+edit_node:
+  title: 编辑节点
+  name: 节点名称
+  icon: 节点图标
+
+# ── 删除节点确认 ──
+delete_node:
+  title: 确定删除此节点？
+  body: 删除后该节点将无法连接面板，需要重新注册。
+  confirm: 确认删除
+
+# ── 新建/编辑实例对话框 ──
+instance_form:
+  title_create: 新建实例
+  title_edit: 编辑实例
+  name: 实例名称
+  name_placeholder: 什么名字比较好呢？
+  uuid: 实例UUID
+  icon: 实例图标
+  command: 实例启动命令
+  command_lock: （停止实例后方可修改）
+  folder: 实例文件夹
+  folder_lock: （停止实例后方可修改）
+  stop_command: 实例停止方法
+  auto_start: 自动启动？
+  create: 创建
+  required: 请填写这个。
+
+# ── 删除实例确认 ──
+delete_instance:
+  title: 真的要删除该实例吗？
+  body: 如果该实例处于运行状态，则会强制中止并删除该实例。删除实例后面板并不会清除其文件夹中的数据，如果需要删除，请手动操作。
+  cancel: 取消
+  confirm: 确认删除
+
+# ── 节点设置 ──
+node_settings:
+  title: 设置 — {name}
+  default_shell: 默认Shell
+  shell_placeholder: 留空则自动检测
+
+# ── Hub 设置 ──
+hub_settings:
+  title: Hub 设置
+  security_entry: 安全入口
+  entry_hint: 设置后访问 /{entry} 才可进入面板，其余路径返回 404
+  entry_placeholder: 留空则无安全入口
+  security_content: 返回内容
+
+# ── 文件上传 ──
+upload:
+  title: 上传文件
+  dropzone_hint: 点击选择文件或拖拽文件到此处
+  file: 文件
+  size: 大小
+  path_hint: 上传路径（留空使用节点的家目录）
+  path_placeholder: 留空则上传到家目录
+  uploading: 上传中… {received} / {total}
+  complete: 上传完成
+  failed: 上传失败
+  connection_failed: 连接失败
+  connection_lost: 连接断开
+  close: 关闭
+  cancel: 取消
+  upload: 上传
+  done: 完成
+
+# ── 终端 ──
+terminal:
+  unavailable: 终端不可用（没有指定节点）。
+  connection_closed: '[连接已关闭]'
+  connection_error: '[连接发生错误]'
+
+# ── 语言切换 ──
+lang:
+  label: 中文（简体）
+  title: Languages
+  select: 选择语言
+
+# ── 通知 ──
+notification:
+  node_offline: 节点已断开。
+  copy_success: 复制成功。

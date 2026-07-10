@@ -2,7 +2,7 @@
   <!-- ===== 加载中 ===== -->
   <div v-if="authState === 'loading'" class="auth-screen">
     <div class="auth-box">
-      <div class="auth-loading">正在加载…</div>
+      <div class="auth-loading">{{ $t('loading') }}</div>
     </div>
   </div>
 
@@ -10,12 +10,12 @@
   <div v-else-if="authState === 'login'" class="auth-screen">
     <div class="auth-box">
       <div class="auth-title">YPanel</div>
-      <div class="auth-subtitle">请登录</div>
+      <div class="auth-subtitle">{{ $t('login.subtitle') }}</div>
       <div class="auth-field">
-        <input v-model="loginPassword" type="password" class="input" placeholder="密码" @keyup.enter="doLogin" />
+        <input v-model="loginPassword" type="password" class="input" :placeholder="$t('login.password')" @keyup.enter="doLogin" />
       </div>
       <div v-if="loginError" class="auth-error">{{ loginError }}</div>
-      <button class="btn btn-primary auth-btn" @click="doLogin">登录</button>
+      <button class="btn btn-primary auth-btn" @click="doLogin">{{ $t('login.login') }}</button>
     </div>
   </div>
 
@@ -23,16 +23,16 @@
   <div v-else-if="authState === 'change-password'" class="auth-screen">
     <div class="auth-box">
       <div class="auth-title">YPanel</div>
-      <div class="auth-subtitle">请修改默认密码</div>
+      <div class="auth-subtitle">{{ $t('change_password.title') }}</div>
       <div class="auth-field">
-        <input v-model="changeNewPassword" type="password" class="input" placeholder="新密码" @keyup.enter="doChangePassword" />
+        <input v-model="changeNewPassword" type="password" class="input" :placeholder="$t('change_password.new_password')" @keyup.enter="doChangePassword" />
       </div>
       <div class="auth-field">
-        <input v-model="changeConfirmPassword" type="password" class="input" placeholder="重复新密码" @keyup.enter="doChangePassword" />
+        <input v-model="changeConfirmPassword" type="password" class="input" :placeholder="$t('change_password.confirm_password')" @keyup.enter="doChangePassword" />
       </div>
       <div v-if="changeError" class="auth-error">{{ changeError }}</div>
       <button class="btn btn-primary auth-btn" :disabled="changingPassword" @click="doChangePassword">
-        {{ changingPassword ? '保存中…' : '保存' }}
+        {{ changingPassword ? $t('saving') : $t('save') }}
       </button>
     </div>
   </div>
@@ -69,17 +69,18 @@
         <!-- 快捷操作栏 -->
         <div class="quick-actions">
           <template v-if="activeNodeId !== null">
-            <button @click="openNewInstance">新建实例</button>
-            <button @click="openUploadDialog">上传文件…</button>
-            <button @click="openSettings">设置</button>
-            <button @click="leaveNode" class="qa-back">返回节点列表</button>
+            <button @click="openNewInstance">{{ $t('quick.new_instance') }}</button>
+            <button @click="openUploadDialog">{{ $t('quick.upload_file') }}</button>
+            <button @click="openSettings">{{ $t('quick.settings') }}</button>
+            <button @click="leaveNode" class="qa-back">{{ $t('quick.back_to_nodes') }}</button>
           </template>
           <template v-else>
-            <button @click="openNodeDialog">新增节点…</button>
-            <button @click="openHubSettings">设置</button>
+            <button @click="openNodeDialog">{{ $t('quick.add_node') }}</button>
+            <button @click="openHubSettings">{{ $t('quick.hub_settings') }}</button>
           </template>
-          <button>帮助</button>
-          <button @click="doLogout" class="qa-back" style="margin-left:auto">退出登录</button>
+          <button>{{ $t('quick.help') }}</button>
+          <button @click="cycleLocale" class="lang-btn">{{ $t('lang.title') }}</button>
+          <button @click="doLogout" class="qa-back" style="margin-left:auto">{{ $t('quick.logout') }}</button>
         </div>
 
         <!-- 主体区域 -->
@@ -93,7 +94,7 @@
                 class="instance-card"
                 :class="{ selected: node.id === selectedNodeId }"
                 @click="selectNode(node.id)"
-                @dblclick="switchToNode(node.id)"
+                @dblclick="dblclickNode(node)"
               >
                 <div class="inst-icon-wrap">
                   <img class="inst-icon" :src="'/assets/instances/' + (node.icon || 'gear.svg')" :alt="node.name" />
@@ -102,7 +103,7 @@
                 <span class="inst-name">{{ node.name }}</span>
               </div>
               <div v-if="nodes.length === 0" class="no-instances-hint">
-                暂无节点，点击「新增节点…」创建
+                {{ $t('nodes.none') }}
               </div>
             </div>
             <div class="function-menu">
@@ -112,15 +113,15 @@
                 </div>
                 <div class="fm-name">{{ selectedNodeForMenu.name }}</div>
                 <div class="fm-actions">
-                  <button class="fm-btn" :disabled="!selectedNodeForMenu.connected"
-                    @click="switchToNode(selectedNodeForMenu.id)">切换</button>
                   <button class="fm-btn"
-                    @click="openEditNode">编辑</button>
+                    @click="clickSwitchNode(selectedNodeForMenu)">{{ $t('nodes.switch') }}</button>
+                  <button class="fm-btn"
+                    @click="openEditNode">{{ $t('nodes.edit') }}</button>
                   <button class="fm-btn fm-btn-danger"
-                    @click="deleteNode(selectedNodeForMenu.id)">删除</button>
+                    @click="openNodeDelete(selectedNodeForMenu.id)">{{ $t('nodes.delete') }}</button>
                 </div>
               </template>
-              <div v-else class="fm-empty">选择一个节点</div>
+              <div v-else class="fm-empty">{{ $t('nodes.select_hint') }}</div>
             </div>
           </template>
 
@@ -142,7 +143,7 @@
                 <span class="inst-name">{{ inst.name }} #{{ inst.id }}</span>
               </div>
               <div v-if="instances.length === 0" class="no-instances-hint">
-                该节点暂无实例，点击「新建实例」添加
+                {{ $t('instances.none') }}
               </div>
             </div>
             <div class="function-menu">
@@ -152,14 +153,14 @@
                 </div>
                 <div class="fm-name">{{ selectedInstance.name }}</div>
                 <div class="fm-actions">
-                  <button class="fm-btn" @click="startInstance">启动</button>
-                  <button class="fm-btn" @click="stopInstance">停止</button>
-                  <button class="fm-btn" @click="openTerminal">打开终端</button>
-                  <button class="fm-btn" @click="openEditInstance">编辑</button>
-                  <button class="fm-btn fm-btn-danger" @click="openDeleteConfirm">删除实例</button>
+                  <button class="fm-btn" @click="startInstance">{{ $t('instances.start') }}</button>
+                  <button class="fm-btn" @click="stopInstance">{{ $t('instances.stop') }}</button>
+                  <button class="fm-btn" @click="openTerminal">{{ $t('instances.open_terminal') }}</button>
+                  <button class="fm-btn" @click="openEditInstance">{{ $t('instances.edit') }}</button>
+                  <button class="fm-btn fm-btn-danger" @click="openDeleteConfirm">{{ $t('instances.delete') }}</button>
                 </div>
               </template>
-              <div v-else class="fm-empty">选择一个实例</div>
+              <div v-else class="fm-empty">{{ $t('instances.select_hint') }}</div>
             </div>
           </template>
         </div>
@@ -186,24 +187,24 @@
     <!-- ===== 新增节点对话框（仅名称+生成） ===== -->
     <div v-if="showNodeDialog" class="dialog-overlay" @click.self="closeNodeDialog">
       <div class="dialog dialog-sm">
-        <div class="dialog-title">新增节点</div>
+        <div class="dialog-title">{{ $t('add_node.title') }}</div>
         <div class="dialog-body">
           <div class="node-gen-row">
             <input
               v-model="newNodeName"
               type="text"
               class="input"
-              placeholder="节点名称（可选）"
+              :placeholder="$t('add_node.name_placeholder')"
               @keyup.enter="generateNodeToken"
             />
             <button class="btn btn-primary" :disabled="generatingNode" @click="generateNodeToken">
-              {{ generatingNode ? '生成中…' : '生成 Token' }}
+              {{ generatingNode ? $t('add_node.generating') : $t('add_node.generate') }}
             </button>
           </div>
           <div v-if="nodeError" class="field-error">{{ nodeError }}</div>
         </div>
         <div class="dialog-actions">
-          <button class="btn btn-secondary" @click="closeNodeDialog">关闭</button>
+          <button class="btn btn-secondary" @click="closeNodeDialog">{{ $t('close') }}</button>
         </div>
       </div>
     </div>
@@ -211,17 +212,17 @@
     <!-- ===== Token 命令对话框 ===== -->
     <div v-if="showGeneratedToken" class="dialog-overlay" @click.self="showGeneratedToken = false">
       <div class="dialog">
-        <div class="dialog-title">新节点「{{ generatedNodeName }}」</div>
+        <div class="dialog-title">{{ $t('token_dialog.title', { name: generatedNodeName }) }}</div>
         <div class="dialog-body">
-          <div class="node-token-label" style="margin-bottom:8px">在目标机器上运行以下命令：</div>
+          <div class="node-token-label" style="margin-bottom:8px">{{ $t('token_dialog.command_hint') }}</div>
           <div class="token-cmd-box">
             <code class="token-cmd-text">node index.js -s {{ wsHost }}/link -t {{ generatedToken }}</code>
           </div>
-          <div class="token-cmd-note">节点连接后此窗口将自动关闭。</div>
+          <div class="token-cmd-note">{{ $t('token_dialog.auto_close') }}</div>
         </div>
         <div class="dialog-actions">
-          <button class="btn btn-primary" @click="copyToken">复制命令</button>
-          <button class="btn btn-secondary" @click="showGeneratedToken = false">关闭</button>
+          <button class="btn btn-primary" @click="copyToken">{{ $t('token_dialog.copy') }}</button>
+          <button class="btn btn-secondary" @click="showGeneratedToken = false">{{ $t('close') }}</button>
         </div>
       </div>
     </div>
@@ -229,19 +230,19 @@
     <!-- ===== 编辑节点对话框 ===== -->
     <div v-if="showEditNodeDialog" class="dialog-overlay" @click.self="closeEditNode">
       <div class="dialog">
-        <div class="dialog-title">编辑节点</div>
+        <div class="dialog-title">{{ $t('edit_node.title') }}</div>
         <div class="dialog-body">
           <label class="field">
-            <span class="field-label">节点名称</span>
+            <span class="field-label">{{ $t('edit_node.name') }}</span>
             <input
               v-model="editNodeData.name"
               type="text"
               class="input"
-              placeholder="节点名称"
+              :placeholder="$t('edit_node.name')"
             />
           </label>
           <label class="field">
-            <span class="field-label">节点图标</span>
+            <span class="field-label">{{ $t('edit_node.icon') }}</span>
             <div class="icon-selector" @click="showNodeIconPicker = !showNodeIconPicker">
               <img class="icon-preview" :src="'/assets/instances/' + editNodeData.icon" :alt="editNodeData.icon" />
               <span class="icon-name">{{ editNodeData.icon }}</span>
@@ -260,9 +261,9 @@
           </label>
         </div>
         <div class="dialog-actions">
-          <button class="btn btn-secondary" @click="closeEditNode">取消</button>
+          <button class="btn btn-secondary" @click="closeEditNode">{{ $t('cancel') }}</button>
           <button class="btn btn-primary" :disabled="savingNode" @click="saveEditNode">
-            {{ savingNode ? '保存中…' : '保存' }}
+            {{ savingNode ? $t('saving') : $t('save') }}
           </button>
         </div>
       </div>
@@ -271,21 +272,21 @@
     <!-- ===== 新建/编辑实例对话框 ===== -->
     <div v-if="showNewDialog" class="dialog-overlay" @click.self="closeNewDialog">
       <div class="dialog">
-        <div class="dialog-title">{{ isEditing ? '编辑实例' : '新建实例' }}</div>
+        <div class="dialog-title">{{ isEditing ? $t('instance_form.title_edit') : $t('instance_form.title_create') }}</div>
         <div class="dialog-body">
           <label class="field">
-            <span class="field-label">实例名称</span>
+            <span class="field-label">{{ $t('instance_form.name') }}</span>
             <input
               v-model="newData.name"
               type="text"
               class="input"
               :class="{ invalid: errors.name }"
-              placeholder="什么名字比较好呢？"
+              :placeholder="$t('instance_form.name_placeholder')"
             />
-            <span v-if="errors.name" class="field-error">请填写这个。</span>
+            <span v-if="errors.name" class="field-error">{{ $t('instance_form.required') }}</span>
           </label>
           <label class="field">
-            <span class="field-label">实例UUID</span>
+            <span class="field-label">{{ $t('instance_form.uuid') }}</span>
             <input
               :value="newData.uuid"
               type="text"
@@ -294,7 +295,7 @@
             />
           </label>
           <label class="field">
-            <span class="field-label">实例图标</span>
+            <span class="field-label">{{ $t('instance_form.icon') }}</span>
             <div class="icon-selector" @click="showInstanceIconPicker = !showInstanceIconPicker">
               <img class="icon-preview" :src="'/assets/instances/' + newData.icon" :alt="newData.icon" />
               <span class="icon-name">{{ newData.icon }}</span>
@@ -313,8 +314,8 @@
           </label>
           <label class="field">
             <span class="field-label">
-              实例启动命令
-              <span v-if="isEditingLocked" class="field-hint">（停止实例后方可修改）</span>
+              {{ $t('instance_form.command') }}
+              <span v-if="isEditingLocked" class="field-hint">{{ $t('instance_form.command_lock') }}</span>
             </span>
             <input
               v-model="newData.command"
@@ -324,12 +325,12 @@
               :disabled="isEditingLocked"
               placeholder="java -jar xxx.jar"
             />
-            <span v-if="errors.command" class="field-error">请填写这个。</span>
+            <span v-if="errors.command" class="field-error">{{ $t('instance_form.required') }}</span>
           </label>
           <label class="field">
             <span class="field-label">
-              实例文件夹
-              <span v-if="isEditingLocked" class="field-hint">（停止实例后方可修改）</span>
+              {{ $t('instance_form.folder') }}
+              <span v-if="isEditingLocked" class="field-hint">{{ $t('instance_form.folder_lock') }}</span>
             </span>
             <input
               v-model="newData.folder"
@@ -339,10 +340,10 @@
               :disabled="isEditingLocked"
               placeholder="path/to/your/folder"
             />
-            <span v-if="errors.folder" class="field-error">请填写这个。</span>
+            <span v-if="errors.folder" class="field-error">{{ $t('instance_form.required') }}</span>
           </label>
           <label class="field">
-            <span class="field-label">实例停止方法</span>
+            <span class="field-label">{{ $t('instance_form.stop_command') }}</span>
             <input
               v-model="newData.stopCommand"
               type="text"
@@ -352,13 +353,13 @@
           </label>
           <label class="field field-row">
             <input type="checkbox" class="checkbox" v-model="newData.autoStart" />
-            <span class="field-label">自动启动？</span>
+            <span class="field-label">{{ $t('instance_form.auto_start') }}</span>
           </label>
         </div>
         <div class="dialog-actions">
-          <button class="btn btn-secondary" @click="closeNewDialog">取消</button>
+          <button class="btn btn-secondary" @click="closeNewDialog">{{ $t('cancel') }}</button>
           <button class="btn btn-primary" :disabled="saving" @click="createInstance">
-            {{ saving ? '保存中…' : isEditing ? '保存' : '创建' }}
+            {{ saving ? $t('saving') : isEditing ? $t('save') : $t('instance_form.create') }}
           </button>
         </div>
       </div>
@@ -367,22 +368,22 @@
     <!-- ===== 设置对话框 ===== -->
     <div v-if="showSettings" class="dialog-overlay" @click.self="closeSettings">
       <div class="dialog">
-        <div class="dialog-title">设置 — {{ activeNode?.name || '节点' }}</div>
+        <div class="dialog-title">{{ $t('node_settings.title', { name: activeNode?.name || 'Node' }) }}</div>
         <div class="dialog-body">
           <label class="field">
-            <span class="field-label">默认Shell</span>
+            <span class="field-label">{{ $t('node_settings.default_shell') }}</span>
             <input
               v-model="settings.defaultShell"
               type="text"
               class="input mono"
-              placeholder="留空则自动检测"
+              :placeholder="$t('node_settings.shell_placeholder')"
             />
           </label>
         </div>
         <div class="dialog-actions">
-          <button class="btn btn-secondary" @click="closeSettings">取消</button>
+          <button class="btn btn-secondary" @click="closeSettings">{{ $t('cancel') }}</button>
           <button class="btn btn-primary" :disabled="savingSettings" @click="saveSettings">
-            {{ savingSettings ? '保存中…' : '保存' }}
+            {{ savingSettings ? $t('saving') : $t('save') }}
           </button>
         </div>
       </div>
@@ -391,23 +392,23 @@
     <!-- ===== Hub 设置对话框 ===== -->
     <div v-if="showHubSettings" class="dialog-overlay" @click.self="closeHubSettings">
       <div class="dialog">
-        <div class="dialog-title">Hub 设置</div>
+        <div class="dialog-title">{{ $t('hub_settings.title') }}</div>
         <div class="dialog-body">
           <label class="field">
-            <span class="field-label">安全入口</span>
+            <span class="field-label">{{ $t('hub_settings.security_entry') }}</span>
             <div class="input-with-prefix">
               <span class="input-prefix">/</span>
               <input
                 v-model="hubSecurityEntry"
                 type="text"
                 class="input prefix-input"
-                placeholder="留空则无安全入口"
+                :placeholder="$t('hub_settings.entry_placeholder')"
               />
             </div>
-            <span class="field-hint">设置后访问 /{{ hubSecurityEntry }} 才可进入面板，其余路径返回 404</span>
+            <span class="field-hint">{{ $t('hub_settings.entry_hint', { entry: hubSecurityEntry }) }}</span>
           </label>
           <label class="field">
-            <span class="field-label">返回内容</span>
+            <span class="field-label">{{ $t('hub_settings.security_content') }}</span>
             <textarea
               v-model="hubSecurityContent"
               class="textarea"
@@ -416,9 +417,9 @@
           </label>
         </div>
         <div class="dialog-actions">
-          <button class="btn btn-secondary" @click="closeHubSettings">取消</button>
+          <button class="btn btn-secondary" @click="closeHubSettings">{{ $t('cancel') }}</button>
           <button class="btn btn-primary" :disabled="savingHubSettings" @click="saveHubSettings">
-            {{ savingHubSettings ? '保存中…' : '保存' }}
+            {{ savingHubSettings ? $t('saving') : $t('save') }}
           </button>
         </div>
       </div>
@@ -427,30 +428,30 @@
     <!-- ===== 上传文件对话框 ===== -->
     <div v-if="showUploadDialog" class="dialog-overlay" @click.self="cancelUpload">
       <div class="dialog">
-        <div class="dialog-title">上传文件</div>
+        <div class="dialog-title">{{ $t('upload.title') }}</div>
         <div class="dialog-body">
           <template v-if="!uploadFile">
             <div class="upload-dropzone" @click="triggerFileInput" @dragover.prevent @drop.prevent="onFileDrop">
-              <div class="upload-hint">点击选择文件或拖拽文件到此处</div>
+              <div class="upload-hint">{{ $t('upload.dropzone_hint') }}</div>
             </div>
             <input ref="fileInputRef" type="file" class="upload-input-hidden" @change="onFileSelected" />
           </template>
           <template v-else>
             <label class="field">
-              <span class="field-label">文件</span>
+              <span class="field-label">{{ $t('upload.file') }}</span>
               <input type="text" class="input mono" :value="uploadFile.name" readonly />
             </label>
             <label class="field">
-              <span class="field-label">大小</span>
+              <span class="field-label">{{ $t('upload.size') }}</span>
               <input type="text" class="input" :value="formatSize(uploadFile.size)" readonly />
             </label>
             <label class="field">
-              <span class="field-label">上传路径（留空使用节点的家目录）</span>
+              <span class="field-label">{{ $t('upload.path_hint') }}</span>
               <input
                 v-model="uploadPath"
                 type="text"
                 class="input mono"
-                placeholder="留空则上传到家目录"
+                :placeholder="$t('upload.path_placeholder')"
               />
             </label>
             <div v-if="uploadStatus" class="upload-status-area">
@@ -459,10 +460,10 @@
               </div>
               <div class="upload-progress-text">
                 <template v-if="uploadStatus === 'uploading'">
-                  上传中… {{ formatSize(uploadReceived) }} / {{ formatSize(uploadTotal) }}
+                  {{ $t('upload.uploading', { received: formatSize(uploadReceived), total: formatSize(uploadTotal) }) }}
                 </template>
                 <template v-else-if="uploadStatus === 'complete'">
-                  上传完成
+                  {{ $t('upload.complete') }}
                 </template>
                 <template v-else-if="uploadStatus === 'error'">
                   {{ uploadError }}
@@ -473,14 +474,14 @@
         </div>
         <div class="dialog-actions">
           <template v-if="!uploadFile">
-            <button class="btn btn-secondary" @click="cancelUpload">关闭</button>
+            <button class="btn btn-secondary" @click="cancelUpload">{{ $t('upload.close') }}</button>
           </template>
           <template v-else-if="uploadStatus === 'idle' || uploadStatus === 'error'">
-            <button class="btn btn-secondary" @click="cancelUpload">取消</button>
-            <button class="btn btn-primary" @click="startUpload">上传</button>
+            <button class="btn btn-secondary" @click="cancelUpload">{{ $t('upload.cancel') }}</button>
+            <button class="btn btn-primary" @click="startUpload">{{ $t('upload.upload') }}</button>
           </template>
           <template v-else-if="uploadStatus === 'complete'">
-            <button class="btn btn-primary" @click="cancelUpload">完成</button>
+            <button class="btn btn-primary" @click="cancelUpload">{{ $t('upload.done') }}</button>
           </template>
         </div>
       </div>
@@ -489,17 +490,63 @@
     <!-- ===== 删除确认对话框 ===== -->
     <div v-if="showDeleteConfirm" class="dialog-overlay" @click.self="cancelDelete">
       <div class="dialog dialog-sm">
-        <div class="dialog-title">真的要删除该实例吗？</div>
+        <div class="dialog-title">{{ $t('delete_instance.title') }}</div>
         <div class="dialog-body">
-          <p class="delete-warning">
-            如果该实例处于运行状态，则会强制中止并删除该实例。
-            删除实例后面板并不会清除其文件夹中的数据，如果需要删除，请手动操作。
-          </p>
+          <p class="delete-warning">{{ $t('delete_instance.body') }}</p>
         </div>
         <div class="dialog-actions">
-          <button class="btn btn-secondary" @click="cancelDelete">取消</button>
-          <button class="btn btn-danger" @click="confirmDelete">确认删除</button>
+          <button class="btn btn-secondary" @click="cancelDelete">{{ $t('delete_instance.cancel') }}</button>
+          <button class="btn btn-danger" @click="confirmDelete">{{ $t('delete_instance.confirm') }}</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ===== 节点删除确认对话框 ===== -->
+    <div v-if="showNodeDeleteConfirm" class="dialog-overlay" @click.self="cancelNodeDelete">
+      <div class="dialog dialog-sm">
+        <div class="dialog-title">{{ $t('delete_node.title') }}</div>
+        <div class="dialog-body">
+          <p class="delete-warning">{{ $t('delete_node.body') }}</p>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" @click="cancelNodeDelete">{{ $t('cancel') }}</button>
+          <button class="btn btn-danger" @click="confirmNodeDelete">{{ $t('delete_node.confirm') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 语言选择对话框 ===== -->
+    <div v-if="showLangDialog" class="dialog-overlay" @click.self="closeLangDialog">
+      <div class="dialog dialog-sm">
+        <div class="dialog-title">{{ $t('lang.select') }}</div>
+        <div class="dialog-body">
+          <div
+            v-for="code in localeCodes"
+            :key="code"
+            class="lang-option"
+            :class="{ selected: code === locale }"
+            @click="setLang(code)"
+          >
+            <span class="lang-option-name">{{ messages[code].name }}</span>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" @click="closeLangDialog">{{ $t('cancel') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 通知弹窗 ===== -->
+    <div class="toast-container">
+      <div
+        v-for="n in notifications"
+        :key="n.id"
+        class="toast"
+        :class="'toast-' + n.type"
+      >
+        <div class="toast-bar"></div>
+        <button class="toast-close" @click="dismissNotification(n.id)">&times;</button>
+        <div class="toast-body">{{ n.message }}</div>
       </div>
     </div>
   </div>
@@ -507,6 +554,7 @@
 
 <script lang="ts">
 import { defineComponent, reactive, ref, computed, watch, defineAsyncComponent } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const TerminalTab = defineAsyncComponent(() => import('./TerminalTab.vue'));
 
@@ -562,6 +610,7 @@ interface NewInstanceData {
 export default defineComponent({
   components: { TerminalTab },
   setup() {
+    const { t, locale } = useI18n();
     // ── 认证状态 ──
     const authState = ref<'loading' | 'login' | 'change-password' | 'authenticated'>('loading');
     const loginPassword = ref('');
@@ -618,19 +667,19 @@ export default defineComponent({
             await loadNodes(); // 立即加载节点列表，不等 events WS
           }
         } else {
-          loginError.value = data.error || '登录失败';
+          loginError.value = data.error || t('login.failed');
         }
-      } catch { loginError.value = '网络错误'; }
+      } catch { loginError.value = t('network_error'); }
     }
 
     async function doChangePassword(): Promise<void> {
       changeError.value = '';
       if (changeNewPassword.value !== changeConfirmPassword.value) {
-        changeError.value = '两次输入的密码不一致';
+        changeError.value = t('change_password.mismatch');
         return;
       }
       if (!changeNewPassword.value) {
-        changeError.value = '密码不能为空';
+        changeError.value = t('change_password.empty');
         return;
       }
       changingPassword.value = true;
@@ -646,9 +695,9 @@ export default defineComponent({
           authState.value = 'authenticated';
           await loadNodes(); // 立即加载节点列表
         } else {
-          changeError.value = data.error || '修改失败';
+          changeError.value = data.error || t('change_password.failed');
         }
-      } catch { changeError.value = '网络错误'; }
+      } catch { changeError.value = t('network_error'); }
       finally { changingPassword.value = false; }
     }
 
@@ -674,7 +723,7 @@ export default defineComponent({
 
     // ── 标签页 ──
     const tabs = reactive<TabData[]>([
-      { id: 0, title: '主页', type: 'home' },
+      { id: 0, title: t('tab.home'), type: 'home' },
     ]);
     const activeId = ref(0);
     const tabRefs = ref<Record<number, any>>({});
@@ -694,7 +743,7 @@ export default defineComponent({
       }
       const id = nextTabId++;
       tabs.push({
-        id, title: title || `终端 ${id}`,
+        id, title: title || t('tab.terminal', { id }),
         type: 'terminal', initCommands,
         instanceId: instanceId, nodeId: nodeId ?? null,
       });
@@ -780,22 +829,39 @@ export default defineComponent({
           const data = await res.json();
           generatedToken.value = data.token;
           generatedNodeName.value = data.nodeName;
+          pendingNodeConnCount = nodes.value.filter((n: any) => n.connected).length;
           showGeneratedToken.value = true;
           newNodeName.value = '';
           await loadNodes();
         } else {
-          nodeError.value = '生成 Token 失败';
+          nodeError.value = t('add_node.failed');
         }
       } catch (e) {
-        nodeError.value = '网络错误';
+        nodeError.value = t('network_error');
       } finally {
         generatingNode.value = false;
         closeNodeDialog();
       }
     }
 
-    async function deleteNode(id: number): Promise<void> {
-      if (!confirm('确定删除此节点？')) return;
+    const showNodeDeleteConfirm = ref(false);
+    const pendingDeleteNodeId = ref<number | null>(null);
+
+    function openNodeDelete(id: number): void {
+      pendingDeleteNodeId.value = id;
+      showNodeDeleteConfirm.value = true;
+    }
+
+    function cancelNodeDelete(): void {
+      showNodeDeleteConfirm.value = false;
+      pendingDeleteNodeId.value = null;
+    }
+
+    async function confirmNodeDelete(): Promise<void> {
+      const id = pendingDeleteNodeId.value;
+      if (id === null) return;
+      showNodeDeleteConfirm.value = false;
+      pendingDeleteNodeId.value = null;
       try {
         await apiFetch(`/api/nodes/${id}`, { method: 'DELETE' });
         if (activeNodeId.value === id) {
@@ -808,7 +874,13 @@ export default defineComponent({
     function copyToken(): void {
       const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const cmd = `node index.js -s ${wsProto}//${window.location.host}/link -t ${generatedToken.value}`;
-      navigator.clipboard.writeText(cmd).catch(() => {});
+      navigator.clipboard.writeText(cmd).then(
+        () => {
+          showNotification(t('notification.copy_success'), 'success');
+          showGeneratedToken.value = false;
+        },
+        () => {}
+      );
     }
 
 
@@ -1335,7 +1407,7 @@ export default defineComponent({
           uploadWs = null;
         } else if (msg.type === 'upload_error') {
           uploadStatus.value = 'error';
-          uploadError.value = msg.message || '上传失败';
+          uploadError.value = msg.message || t('upload.failed');
           uploadWs?.close();
           uploadWs = null;
         }
@@ -1343,14 +1415,14 @@ export default defineComponent({
 
       uploadWs.onerror = () => {
         uploadStatus.value = 'error';
-        uploadError.value = '连接失败';
+        uploadError.value = t('upload.connection_failed');
         uploadWs = null;
       };
 
       uploadWs.onclose = () => {
         if (uploadStatus.value === 'uploading') {
           uploadStatus.value = 'error';
-          uploadError.value = '连接断开';
+          uploadError.value = t('upload.connection_lost');
         }
         uploadWs = null;
       };
@@ -1387,6 +1459,13 @@ export default defineComponent({
         case 'nodes': {
           const d = msg.nodes;
           nodes.value = d.nodes || [];
+          // Auto-close token dialog when a new node connects
+          if (showGeneratedToken.value) {
+            const connectedCount = nodes.value.filter((n: any) => n.connected).length;
+            if (connectedCount > pendingNodeConnCount) {
+              showGeneratedToken.value = false;
+            }
+          }
           if (activeNodeId.value !== null && !nodes.value.find((n: any) => n.id === activeNodeId.value)) {
             activeNodeId.value = null;
           }
@@ -1421,6 +1500,79 @@ export default defineComponent({
     if (authState.value === 'authenticated') connectEvents();
 
     const locationHost = window.location.host;
+    const showLangDialog = ref(false);
+    const localeCodes = ['zh-CN', 'en'] as const;
+    const { messages } = useI18n();
+
+    function openLangDialog(): void {
+      showLangDialog.value = true;
+    }
+
+    function closeLangDialog(): void {
+      showLangDialog.value = false;
+    }
+
+    function setLang(code: string): void {
+      document.cookie = `YPanelLang=${encodeURIComponent(code)}; path=/; max-age=${365 * 24 * 60 * 60}; SameSite=Lax`;
+      locale.value = code as 'zh-CN' | 'en';
+      showLangDialog.value = false;
+    }
+
+    // ── 通知弹窗 ──
+    interface NotificationItem {
+      id: number;
+      message: string;
+      type: 'success' | 'error';
+    }
+    const notifications = reactive<NotificationItem[]>([]);
+    let notifyId = 0;
+
+    let pendingNodeConnCount = 0;
+    function showNotification(message: string, type: 'success' | 'error'): void {
+      const id = ++notifyId;
+      notifications.push({ id, message, type });
+      setTimeout(() => {
+        const idx = notifications.findIndex(n => n.id === id);
+        if (idx !== -1) notifications.splice(idx, 1);
+      }, 5000);
+    }
+
+    function dismissNotification(id: number): void {
+      const idx = notifications.findIndex(n => n.id === id);
+      if (idx !== -1) notifications.splice(idx, 1);
+    }
+
+function dblclickNode(node: any): void {
+      if (node.connected) {
+        switchToNode(node.id);
+      } else {
+        showNotification(t('notification.node_offline'), 'error');
+      }
+    }
+
+    function clickSwitchNode(node: any): void {
+      if (node.connected) {
+        switchToNode(node.id);
+      } else {
+        showNotification(t('notification.node_offline'), 'error');
+      }
+    }
+    function cycleLocale(): void {
+      // 按钮点击 → 打开语言选择对话框
+      openLangDialog();
+    }
+
+    // 切换语言时更新已存在的标签页标题
+    watch(locale, () => {
+      for (const tab of tabs) {
+        if (tab.type === 'home') {
+          tab.title = t('tab.home');
+        } else if (tab.type === 'terminal' && !tab.instanceId && tab.id !== 0) {
+          tab.title = t('tab.terminal', { id: tab.id });
+        }
+      }
+    });
+
     const wsHost = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + locationHost;
 
     return {
@@ -1440,8 +1592,11 @@ export default defineComponent({
       openNodeDialog, closeNodeDialog, generateNodeToken, copyToken,
       showEditNodeDialog, editNodeData, savingNode,
       openEditNode, closeEditNode, saveEditNode,
-      deleteNode,
       switchToNode, leaveNode,
+      showNodeDeleteConfirm, pendingDeleteNodeId,
+      openNodeDelete, cancelNodeDelete, confirmNodeDelete,
+      cycleLocale, showLangDialog, localeCodes, locale, messages,
+      openLangDialog, closeLangDialog, setLang,
       // 实例管理
       instances, selectedInstance, selectedId, selectInstance,
       runningStates, showNewDialog, isEditing, isEditingLocked,
@@ -1464,6 +1619,8 @@ export default defineComponent({
       triggerFileInput, onFileSelected, onFileDrop,
       startUpload, formatSize,
       AVAILABLE_ICONS,
+      // 通知弹窗
+      notifications, showNotification, dismissNotification, dblclickNode, clickSwitchNode,
     };
   },
 });

@@ -556,10 +556,10 @@ function writeNodes(data: NodesData): void {
 app.get('/api/nodes', (_req, res) => { res.json(readNodes()); });
 
 app.post('/api/nodes', mutationLimiter, (req, res) => {
-  const { name } = req.body;
+  const { name, lang } = req.body;
   const data = readNodes();
   const token = crypto.randomUUID();
-  const nodeName = name || `节点 ${data.nodes.length + 1}`;
+  const nodeName = name || (lang === 'zh-CN' ? `节点 ${data.nodes.length + 1}` : `Node ${data.nodes.length + 1}`);
   const now = new Date().toISOString();
   data.nodes.push({
     id: data.nodes.length,
@@ -572,7 +572,6 @@ app.post('/api/nodes', mutationLimiter, (req, res) => {
   broadcastEvent({ type: 'nodes', nodes: readNodes() });
   res.json({ token, nodeName });
 });
-
 app.delete('/api/nodes/:id', mutationLimiter, (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
