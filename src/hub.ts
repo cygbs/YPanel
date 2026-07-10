@@ -419,38 +419,6 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════
-// API: Hub 设置（安全入口等）
-// ═══════════════════════════════════════════════════
-
-app.get('/api/hub-settings', (req, res) => {
-  res.json(readHubSettings());
-});
-
-app.put('/api/hub-settings', mutationLimiter, (req, res) => {
-  const { securityEntry, securityContent } = req.body;
-  const s = readHubSettings();
-  const oldEntry = s.securityEntry;
-
-  if (securityEntry !== undefined) {
-    let entry = String(securityEntry).trim();
-    if (!entry.startsWith('/')) entry = '/' + entry;
-    s.securityEntry = entry;
-  }
-  if (securityContent !== undefined) {
-    s.securityContent = String(securityContent);
-  }
-
-  writeHubSettings(s);
-
-  // 安全入口变更时清空所有已有 bypass token
-  if (s.securityEntry !== oldEntry) {
-    securityBypassTokens.clear();
-  }
-
-  res.json(s);
-});
-
-// ═══════════════════════════════════════════════════
 // 认证中间件（保护 /api/* 路由，除 /api/auth/* 外）
 // 从 HttpOnly Cookie 读取 session，不再使用 Bearer 头
 // ═══════════════════════════════════════════════════
@@ -479,6 +447,38 @@ app.use('/api', (req, res, next) => {
     return;
   }
   next();
+});
+
+// ═══════════════════════════════════════════════════
+// API: Hub 设置（受认证+CSRF 中间件保护）
+// ═══════════════════════════════════════════════════
+
+app.get('/api/hub-settings', (req, res) => {
+  res.json(readHubSettings());
+});
+
+app.put('/api/hub-settings', mutationLimiter, (req, res) => {
+  const { securityEntry, securityContent } = req.body;
+  const s = readHubSettings();
+  const oldEntry = s.securityEntry;
+
+  if (securityEntry !== undefined) {
+    let entry = String(securityEntry).trim();
+    if (!entry.startsWith('/')) entry = '/' + entry;
+    s.securityEntry = entry;
+  }
+  if (securityContent !== undefined) {
+    s.securityContent = String(securityContent);
+  }
+
+  writeHubSettings(s);
+
+  // 安全入口变更时清空所有已有 bypass token
+  if (s.securityEntry !== oldEntry) {
+    securityBypassTokens.clear();
+  }
+
+  res.json(s);
 });
 
 // ═══════════════════════════════════════════════════
