@@ -3,7 +3,7 @@
 # YPanel 卸载脚本
 #
 
-# 确保能从终端读取用户输入（防止 pipe 到 bash 时 read 从 stdin 读）
+# 从终端读取用户输入（解决 pipe 到 bash 时 stdin 被管道占用的问题）
 if [ -t 0 ]; then
     READ_CMD() { read -r "$@"; }
 else
