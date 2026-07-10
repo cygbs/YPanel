@@ -1,5 +1,7 @@
 import { createI18n } from 'vue-i18n';
 import zhCN from './locales/zh-CN.yml';
+import zhTW from './locales/zh-TW.yml';
+import lzh from './locales/lzh.yml';
 import en from './locales/en.yml';
 
 /** 从 Cookie 读取语言偏好 */
@@ -15,14 +17,18 @@ function detectLocale(): string {
   if (cookie) return cookie;
 
   const browser = navigator.language || (navigator as any).userLanguage;
-  if (browser?.startsWith('zh')) return 'zh-CN';
+  if (browser?.startsWith('zh')) {
+    // zh-TW / zh-Hant / zh-HK → 繁體
+    if (/tw|hant|hk/i.test(browser)) return 'zh-TW';
+    return 'zh-CN';
+  }
   return 'en';
 }
 
 const i18n = createI18n({
   locale: detectLocale(),
   fallbackLocale: 'en',
-  messages: { 'zh-CN': zhCN, en },
+  messages: { 'zh-CN': zhCN, 'zh-TW': zhTW, lzh, en },
   legacy: false,
 });
 

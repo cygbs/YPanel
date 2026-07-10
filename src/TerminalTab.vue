@@ -4,6 +4,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUnmounted, watch, type PropType } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -100,7 +101,8 @@ export default defineComponent({
       const wsUrl = wsPath ? `${protocol}//${location.host}${wsPath}` : null;
 
       if (!wsUrl) {
-        terminal.write('Terminal unavailable (no node specified).\r\n');
+        const { t } = useI18n();
+      terminal.write(t('terminal.unavailable') + '\r\n');
         return;
       }
 
@@ -140,11 +142,11 @@ export default defineComponent({
       });
 
       ws.addEventListener('close', () => {
-        terminal?.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+        terminal?.write('\r\n\x1b[31m' + t('terminal.connection_closed') + '\x1b[0m\r\n');
       });
 
       ws.addEventListener('error', () => {
-        terminal?.write('\r\n\x1b[31m[Connection error]\x1b[0m\r\n');
+        terminal?.write('\r\n\x1b[31m' + t('terminal.connection_error') + '\x1b[0m\r\n');
       });
 
       terminal.onData((data: string) => {

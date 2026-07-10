@@ -32,6 +32,7 @@ change_password:
 tab:
   home: Home
   new: New Tab
+  close: Close
   terminal: Terminal {id}
 
 # ── Quick Actions ──

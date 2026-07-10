@@ -55,11 +55,11 @@
             v-if="tab.type === 'terminal'"
             class="tab-close"
             @click.stop="closeTab(tab.id)"
-            title="关闭"
+            :title="$t('tab.close')"
           >&times;</span>
         </div>
       </div>
-      <div class="tab-add" @click="addTerminalTab()" title="新标签页">+</div>
+      <div class="tab-add" @click="addTerminalTab()" :title="$t('tab.new')">+</div>
     </div>
 
     <!-- 内容区 -->
@@ -1501,7 +1501,7 @@ export default defineComponent({
 
     const locationHost = window.location.host;
     const showLangDialog = ref(false);
-    const localeCodes = ['zh-CN', 'en'] as const;
+    const localeCodes = ['zh-CN', 'zh-TW', 'lzh', 'en'] as const;
     const { messages } = useI18n();
 
     function openLangDialog(): void {
@@ -1514,7 +1514,7 @@ export default defineComponent({
 
     function setLang(code: string): void {
       document.cookie = `YPanelLang=${encodeURIComponent(code)}; path=/; max-age=${365 * 24 * 60 * 60}; SameSite=Lax`;
-      locale.value = code as 'zh-CN' | 'en';
+      locale.value = code as 'zh-CN' | 'zh-TW' | 'lzh' | 'en';
       showLangDialog.value = false;
     }
 

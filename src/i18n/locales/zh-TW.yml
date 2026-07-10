@@ -1,0 +1,165 @@
+# YPanel 中文（繁體）語言檔案
+# 按 UI 區域分組，便於維護
+
+name: 中文（繁體）
+
+# ── 通用 ──
+loading: 正在載入…
+save: 儲存
+saving: 儲存中…
+cancel: 取消
+close: 關閉
+network_error: 網路錯誤
+
+# ── 登入 ──
+login:
+  title: YPanel
+  subtitle: 請登入
+  password: 密碼
+  login: 登入
+  failed: 登入失敗
+
+# ── 修改預設密碼 ──
+change_password:
+  title: 請修改預設密碼
+  new_password: 新密碼
+  confirm_password: 確認新密碼
+  mismatch: 兩次輸入的密碼不一致
+  empty: 密碼不能為空
+  failed: 修改失敗
+
+# ── 分頁標籤 ──
+tab:
+  home: 首頁
+  new: 新分頁
+  close: 關閉
+  terminal: 終端機 {id}
+
+# ── 快捷操作列 ──
+quick:
+  new_instance: 新增實例
+  upload_file: 上傳檔案…
+  settings: 設定
+  back_to_nodes: 返回節點列表
+  add_node: 新增節點…
+  hub_settings: 設定
+  help: 說明
+  logout: 登出
+
+# ── 節點列表 ──
+nodes:
+  none: 暫無節點，點擊「新增節點…」建立
+  select_hint: 選擇一個節點
+  switch: 切換
+  edit: 編輯
+  delete: 刪除
+
+# ── 實例列表 ──
+instances:
+  none: 該節點暫無實例，點擊「新增實例」加入
+  select_hint: 選擇一個實例
+  start: 啟動
+  stop: 停止
+  open_terminal: 開啟終端機
+  edit: 編輯
+  delete: 刪除實例
+
+# ── 新增節點對話框 ──
+add_node:
+  title: 新增節點
+  name_placeholder: 節點名稱（選填）
+  generate: 產生 Token
+  generating: 產生中…
+  failed: 產生 Token 失敗
+
+# ── Token 命令對話框 ──
+token_dialog:
+  title: 新節點「{name}」
+  command_hint: 在目標機器上執行以下命令：
+  auto_close: 節點連接後此視窗將自動關閉。
+  copy: 複製命令
+
+# ── 編輯節點 ──
+edit_node:
+  title: 編輯節點
+  name: 節點名稱
+  icon: 節點圖示
+
+# ── 刪除節點確認 ──
+delete_node:
+  title: 確定刪除此節點？
+  body: 刪除後該節點將無法連線面板，需要重新註冊。
+  confirm: 確認刪除
+
+# ── 新增/編輯實例對話框 ──
+instance_form:
+  title_create: 新增實例
+  title_edit: 編輯實例
+  name: 實例名稱
+  name_placeholder: 取什麼名字好呢？
+  uuid: 實例 UUID
+  icon: 實例圖示
+  command: 實例啟動指令
+  command_lock: （停止實例後方可修改）
+  folder: 實例資料夾
+  folder_lock: （停止實例後方可修改）
+  stop_command: 實例停止方法
+  auto_start: 自動啟動？
+  create: 建立
+  required: 請填寫此欄位。
+
+# ── 刪除實例確認 ──
+delete_instance:
+  title: 真的要刪除此實例嗎？
+  body: 如果該實例正在執行，將會強制終止並刪除。刪除實例後面板不會清除其資料夾中的資料，如需刪除，請手動操作。
+  cancel: 取消
+  confirm: 確認刪除
+
+# ── 節點設定 ──
+node_settings:
+  title: 設定 — {name}
+  default_shell: 預設 Shell
+  shell_placeholder: 留空則自動偵測
+
+# ── Hub 設定 ──
+hub_settings:
+  title: Hub 設定
+  security_entry: 安全入口
+  entry_hint: 設定後需存取 /{entry} 才能進入面板，其餘路徑回傳 404
+  entry_placeholder: 留空則無安全入口
+  security_content: 回傳內容
+
+# ── 檔案上傳 ──
+upload:
+  title: 上傳檔案
+  dropzone_hint: 點擊選擇檔案或拖曳檔案到此處
+  file: 檔案
+  size: 大小
+  path_hint: 上傳路徑（留空使用節點的家目錄）
+  path_placeholder: 留空則上傳到家目錄
+  uploading: 上傳中… {received} / {total}
+  complete: 上傳完成
+  failed: 上傳失敗
+  connection_failed: 連線失敗
+  connection_lost: 連線中斷
+  close: 關閉
+  cancel: 取消
+  upload: 上傳
+  done: 完成
+
+# ── 終端機 ──
+terminal:
+  unavailable: 終端機不可用（沒有指定節點）。
+  connection_closed: '[連線已關閉]'
+  connection_error: '[連線發生錯誤]'
+
+# ── 語言切換 ──
+lang:
+  label: 中文（繁體）
+  title: Languages
+  select: 選擇語言
+
+# ── 通知 ──
+notification:
+  node_offline: 節點已斷線。
+  copy_success: 複製成功。

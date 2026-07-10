@@ -32,6 +32,7 @@ change_password:
 tab:
   home: 主页
   new: 新标签页
+  close: 关闭
   terminal: 终端 {id}
 
 # ── 快捷操作栏 ──

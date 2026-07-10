@@ -1,0 +1,165 @@
+# YPanel 文言語言檔案
+# 雅言也，雖簡而意達
+
+name: 文言
+
+# ── 通用 ──
+loading: 載入中…
+save: 存儲
+saving: 存儲中…
+cancel: 罷
+close: 闔
+network_error: 網絡不通
+
+# ── 登入 ──
+login:
+  title: YPanel
+  subtitle: 請入
+  password: 密鑰
+  login: 入
+  failed: 入敗
+
+# ── 易密 ──
+change_password:
+  title: 請易初始密鑰
+  new_password: 新密鑰
+  confirm_password: 復驗密鑰
+  mismatch: 兩次密鑰不符
+  empty: 密鑰不可為空
+  failed: 易密敗
+
+# ── 標籤 ──
+tab:
+  home: 首
+  new: 新標籤
+  close: 闔
+  terminal: 終端 {id}
+
+# ── 捷徑 ──
+quick:
+  new_instance: 新立實例
+  upload_file: 上傳文檔…
+  settings: 設定
+  back_to_nodes: 歸節點列
+  add_node: 新增節點…
+  hub_settings: 設定
+  help: 助
+  logout: 出
+
+# ── 節點列 ──
+nodes:
+  none: 尚無節點，請按「新增節點…」以立之
+  select_hint: 請擇一節點
+  switch: 入
+  edit: 編
+  delete: 刪
+
+# ── 實例列 ──
+instances:
+  none: 此節尚無實例，請按「新立實例」以增之
+  select_hint: 請擇一實例
+  start: 啟
+  stop: 止
+  open_terminal: 啟終端
+  edit: 編
+  delete: 刪實例
+
+# ── 新增節點對話框 ──
+add_node:
+  title: 新節點
+  name_placeholder: 節點之名（可略）
+  generate: 造 Token
+  generating: 造中…
+  failed: 造 Token 敗
+
+# ── Token 令對話框 ──
+token_dialog:
+  title: 新節點「{name}」
+  command_hint: 於目標機器行此令：
+  auto_close: 節點既連，此窗自闔。
+  copy: 抄令
+
+# ── 編節點 ──
+edit_node:
+  title: 編節點
+  name: 節點之名
+  icon: 節點之徽
+
+# ── 刪節點確認 ──
+delete_node:
+  title: 確欲刪此節點乎？
+  body: 刪後此節不得復連面板，須重新註冊。
+  confirm: 確刪
+
+# ── 新立/編輯實例對話框 ──
+instance_form:
+  title_create: 新立實例
+  title_edit: 編實例
+  name: 實例之名
+  name_placeholder: 取何名為佳？
+  uuid: 實例 UUID
+  icon: 實例之徽
+  command: 啟實例之令
+  command_lock: （俟實例止方得改）
+  folder: 實例之錄
+  folder_lock: （俟實例止方得改）
+  stop_command: 止實例之法
+  auto_start: 自動啟乎？
+  create: 立
+  required: 請填此欄。
+
+# ── 刪實例確認 ──
+delete_instance:
+  title: 確欲刪此實例乎？
+  body: 若實例正行，將強止而刪之。刪後面板不除其錄中之文檔，若欲盡除，請手動為之。
+  cancel: 罷
+  confirm: 確刪
+
+# ── 節點設定 ──
+node_settings:
+  title: 設定 — {name}
+  default_shell: 預設殼層
+  shell_placeholder: 留空則自檢
+
+# ── Hub 設定 ──
+hub_settings:
+  title: Hub 設定
+  security_entry: 密徑
+  entry_hint: 設後唯訪 /{entry} 方得入面板，其餘路徑返 404
+  entry_placeholder: 留空則無密徑
+  security_content: 返文
+
+# ── 上傳文檔 ──
+upload:
+  title: 上傳文檔
+  dropzone_hint: 按此選檔，或曳檔至此
+  file: 文檔
+  size: 大小
+  path_hint: 上傳路徑（留空則用節點之家目錄）
+  path_placeholder: 留空則上傳至家目錄
+  uploading: 上傳中… {received} / {total}
+  complete: 上傳畢
+  failed: 上傳敗
+  connection_failed: 連不通
+  connection_lost: 連斷
+  close: 闔
+  cancel: 罷
+  upload: 上傳
+  done: 畢
+
+# ── 終端 ──
+terminal:
+  unavailable: 終端不可用（未指定節點）。
+  connection_closed: '[連已斷]'
+  connection_error: '[連有誤]'
+
+# ── 語言 ──
+lang:
+  label: 文言
+  title: Languages
+  select: 擇語
+
+# ── 通知 ──
+notification:
+  node_offline: 節點已斷。
+  copy_success: 抄功。
