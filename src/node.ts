@@ -534,11 +534,8 @@ function handleUploadCancel(msg: any): void {
 // 断连清理
 // ═══════════════════════════════════════════════════
 
-function cleanupAllState(): void {
-  for (const [, mp] of managedProcesses) {
-    try { mp.pty.kill(); } catch { /* ignore */ }
-  }
-  managedProcesses.clear();
+/** 断连清理：只清理终端/上传等临时状态，保留已运行的实例进程 */
+function cleanupTransientState(): void {
   termToProcess.clear();
   for (const [, state] of uploadStates) {
     try { state.stream.end(); } catch { /* ignore */ }
@@ -634,7 +631,7 @@ function connectToHub(): void {
 
   ws.on('close', () => {
     console.log('Disconnected from hub, reconnecting in 5s...');
-    cleanupAllState();
+    cleanupTransientState();
     setTimeout(connectToHub, 5000);
   });
 

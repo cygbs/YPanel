@@ -201,20 +201,6 @@
             </button>
           </div>
           <div v-if="nodeError" class="field-error">{{ nodeError }}</div>
-          <!-- 待处理的 Token -->
-          <div v-if="pendingTokens.length > 0" class="node-list-title" style="margin-top:12px">等待连接的 Token</div>
-          <div v-for="pt in pendingTokens" :key="pt.token" class="node-item pending">
-            <div class="node-info">
-              <div class="node-status-dot pending-dot"></div>
-              <div class="node-details">
-                <span class="node-name">{{ pt.name }}</span>
-                <span class="node-seen">等待连接…</span>
-              </div>
-            </div>
-            <div class="node-actions">
-              <button class="btn btn-danger btn-sm" @click="cancelPendingToken(pt.token)">取消</button>
-            </div>
-          </div>
         </div>
         <div class="dialog-actions">
           <button class="btn btn-secondary" @click="closeNodeDialog">关闭</button>
@@ -731,7 +717,6 @@ export default defineComponent({
 
     // ── 节点管理 ──
     const nodes = ref<any[]>([]);
-    const pendingTokens = ref<any[]>([]);
     const activeNodeId = ref<number | null>(null);
     const activeNode = computed(() => nodes.value.find(n => n.id === activeNodeId.value) ?? null);
     const showNodeDialog = ref(false);
@@ -753,7 +738,6 @@ export default defineComponent({
         if (res.ok) {
           const data = await res.json();
           nodes.value = data.nodes || [];
-          pendingTokens.value = data.pendingTokens || [];
           if (activeNodeId.value !== null && !nodes.value.find(n => n.id === activeNodeId.value)) {
             activeNodeId.value = null;
           }
@@ -827,21 +811,7 @@ export default defineComponent({
       navigator.clipboard.writeText(cmd).catch(() => {});
     }
 
-    watch(pendingTokens, (list) => {
-      if (showGeneratedToken.value && generatedToken.value) {
-        const stillPending = list.some(p => p.token === generatedToken.value);
-        if (!stillPending) {
-          showGeneratedToken.value = false;
-        }
-      }
-    });
 
-    async function cancelPendingToken(token: string): Promise<void> {
-      try {
-        await apiFetch(`/api/nodes/pending/${token}`, { method: 'DELETE' });
-        await loadNodes();
-      } catch { /* ignore */ }
-    }
 
     async function switchToNode(id: number): Promise<void> {
       activeNodeId.value = id;
@@ -1417,7 +1387,6 @@ export default defineComponent({
         case 'nodes': {
           const d = msg.nodes;
           nodes.value = d.nodes || [];
-          pendingTokens.value = d.pendingTokens || [];
           if (activeNodeId.value !== null && !nodes.value.find((n: any) => n.id === activeNodeId.value)) {
             activeNodeId.value = null;
           }
@@ -1463,7 +1432,7 @@ export default defineComponent({
       tabs, activeId, terminalTabs,
       addTerminalTab, closeTab, switchTab, setTabRef,
       // 节点管理
-      nodes, pendingTokens, activeNodeId, activeNode,
+      nodes, activeNodeId, activeNode,
       showNodeDialog, newNodeName, generatingNode,
       generatedToken, generatedNodeName, showGeneratedToken, locationHost, wsHost,
       nodeError,
@@ -1471,7 +1440,7 @@ export default defineComponent({
       openNodeDialog, closeNodeDialog, generateNodeToken, copyToken,
       showEditNodeDialog, editNodeData, savingNode,
       openEditNode, closeEditNode, saveEditNode,
-      deleteNode, cancelPendingToken,
+      deleteNode,
       switchToNode, leaveNode,
       // 实例管理
       instances, selectedInstance, selectedId, selectInstance,

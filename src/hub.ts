@@ -537,22 +537,15 @@ interface NodeEntry {
   icon?: string;
 }
 
-interface PendingToken {
-  token: string;
-  name: string;
-  createdAt: string;
-}
-
 interface NodesData {
   nodes: NodeEntry[];
-  pendingTokens: PendingToken[];
 }
 
 function readNodes(): NodesData {
   ensureDataDir();
-  if (!fs.existsSync(NODES_FILE)) return { nodes: [], pendingTokens: [] };
+  if (!fs.existsSync(NODES_FILE)) return { nodes: [] };
   try { return JSON.parse(fs.readFileSync(NODES_FILE, 'utf-8')); }
-  catch { return { nodes: [], pendingTokens: [] }; }
+  catch { return { nodes: [] }; }
 }
 
 function writeNodes(data: NodesData): void {
@@ -566,9 +559,17 @@ app.post('/api/nodes', mutationLimiter, (req, res) => {
   const { name } = req.body;
   const data = readNodes();
   const token = crypto.randomUUID();
-  const nodeName = name || `节点 ${data.nodes.length + data.pendingTokens.length + 1}`;
-  data.pendingTokens.push({ token, name: nodeName, createdAt: new Date().toISOString() });
+  const nodeName = name || `节点 ${data.nodes.length + 1}`;
+  const now = new Date().toISOString();
+  data.nodes.push({
+    id: data.nodes.length,
+    name: nodeName,
+    token,
+    connected: false,
+    lastSeen: now,
+  });
   writeNodes(data);
+  broadcastEvent({ type: 'nodes', nodes: readNodes() });
   res.json({ token, nodeName });
 });
 
@@ -596,15 +597,6 @@ app.put('/api/nodes/:id', mutationLimiter, (req, res) => {
   if (icon !== undefined) node.icon = icon;
   writeNodes(data);
   res.json(node);
-});
-
-app.delete('/api/nodes/pending/:token', mutationLimiter, (req, res) => {
-  const data = readNodes();
-  const idx = data.pendingTokens.findIndex(p => p.token === req.params.token);
-  if (idx === -1) { res.status(404).json({ error: 'token not found' }); return; }
-  data.pendingTokens.splice(idx, 1);
-  writeNodes(data);
-  res.json({ ok: true });
 });
 
 // ═══════════════════════════════════════════════════
@@ -717,23 +709,15 @@ function handleLinkConnection(ws: WebSocket): void {
     switch (msg.type) {
       case 'register': {
         const data = readNodes();
-        const pIdx = data.pendingTokens.findIndex((p: any) => p.token === msg.token);
         const existing = data.nodes.find((n: any) => n.token === msg.token);
-        if (pIdx !== -1 || existing) {
-          const nodeName = pIdx !== -1 ? data.pendingTokens[pIdx].name : existing!.name;
-          if (pIdx !== -1) data.pendingTokens.splice(pIdx, 1);
+        if (existing) {
+          const nodeName = existing.name;
           const now = new Date().toISOString();
-          let nodeId: number;
-          if (existing) {
-            nodeId = existing.id;
-            existing.connected = true;
-            existing.lastSeen = now;
-            const oldWs = nodeConnections.get(nodeId);
-            if (oldWs && oldWs !== ws) { try { oldWs.close(); } catch { /* ignore */ } }
-          } else {
-            nodeId = data.nodes.length;
-            data.nodes.push({ id: nodeId, name: nodeName, token: msg.token, connected: true, lastSeen: now });
-          }
+          const nodeId = existing.id;
+          existing.connected = true;
+          existing.lastSeen = now;
+          const oldWs = nodeConnections.get(nodeId);
+          if (oldWs && oldWs !== ws) { try { oldWs.close(); } catch { /* ignore */ } }
           writeNodes(data);
           nodeConnections.set(nodeId, ws);
           wsToNodeId.set(ws, nodeId);
