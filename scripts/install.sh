@@ -44,8 +44,64 @@ fi
 
 # 4. 确认安装
 echo ""
+#!/bin/bash
+#
+# YPanel 自动安装脚本
+# 支持 systemd 的 Linux 发行版
+#
+# 用法：curl -o- https://raw.githubusercontent.com/cygbs/YPanel/refs/heads/main/scripts/install.sh | sudo bash
+#
+
+# 确保能从终端读取用户输入（防止 pipe 到 bash 时 read 从 stdin 读）
+if [ -t 0 ]; then
+    READ_CMD() { read -r "$@"; }
+else
+    READ_CMD() { read -r "$@" < /dev/tty; }
+fi
+
+set -euo pipefail
+
+# ── 颜色定义 ──
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+info()  { echo -e "${GREEN}[INFO]${NC}  $1"; }
+warn()  { echo -e "${YELLOW}[WARN]${NC}  $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; }
+step()  { echo -e "\n${CYAN}━━━ $1 ━━━${NC}"; }
+
+# ═══════════════════════════════════════════════════
+# 前置检查
+# ═══════════════════════════════════════════════════
+
+# 1. root 权限检查
+if [ "$(id -u)" -ne 0 ]; then
+    error "此脚本需要 root 权限运行，请使用 sudo 或以 root 用户执行。"
+    exit 1
+fi
+
+# 2. ypanel 用户存在性检查
+if id "ypanel" &>/dev/null; then
+    error "系统中已存在 ypanel 用户。"
+    echo "  如果已安装 YPanel，请直接使用。如需重装，请先删除用户："
+    echo "    userdel -r ypanel"
+    echo "    rm -rf /opt/ypanel"
+    exit 1
+fi
+
+# 3. systemd 检查
+if ! command -v systemctl &>/dev/null; then
+    error "未检测到 systemd。此脚本仅支持 systemd 的 Linux 发行版。"
+    exit 1
+fi
+
+# 4. 确认安装
+echo ""
 printf '%b' "${YELLOW}是否安装 YPanel？${NC} (y/N): "
-read -r confirm
+READ_CMD confirm
 if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
     info "安装已取消。"
     exit 0
@@ -232,7 +288,7 @@ echo ""
 step "配置 Node 端（可选）"
 
 printf '%b' "${YELLOW}是否需要配置 Node 端？${NC} (y/N): "
-read -r setup_node
+READ_CMD setup_node
 if [[ ! "$setup_node" =~ ^[Yy]$ ]]; then
     info ""
     info "安装完成！后续可以用以下命令手动配置 Node 端："
@@ -250,7 +306,7 @@ echo ""
 echo -e "${CYAN}将启动命令粘贴到下方（例如：node index.js -s ws://.../link -t <token>）${NC}"
 echo -e "${CYAN}然后按回车确认：${NC}"
 echo ""
-read -p "启动命令 > " node_cmd
+printf "启动命令 > " && READ_CMD node_cmd
 
 if [ -z "$node_cmd" ]; then
     error "命令不能为空，安装取消。"

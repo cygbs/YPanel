@@ -2,6 +2,14 @@
 #
 # YPanel 卸载脚本
 #
+
+# 确保能从终端读取用户输入（防止 pipe 到 bash 时 read 从 stdin 读）
+if [ -t 0 ]; then
+    READ_CMD() { read -r "$@"; }
+else
+    READ_CMD() { read -r "$@" < /dev/tty; }
+fi
+
 set -euo pipefail
 
 # ── 颜色定义 ──
@@ -43,7 +51,7 @@ fi
 # 4. 确认卸载
 echo ""
 printf '%b' "${YELLOW}确定要卸载 YPanel？此操作不可恢复！${NC} (y/N): "
-read -r confirm
+READ_CMD confirm
 if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
     info "卸载已取消。"
     exit 0
@@ -109,7 +117,7 @@ if $YPANEL_EXISTS; then
 fi
 echo ""
 printf '%b' "${YELLOW}确认删除以上目录？${NC} (y/N): "
-read -r confirm_dirs
+READ_CMD confirm_dirs
 if [[ ! "$confirm_dirs" =~ ^[Yy]$ ]]; then
     warn "目录删除已跳过。请手动清理："
     echo "  rm -rf /opt/ypanel"
@@ -132,7 +140,7 @@ step "删除 ypanel 用户"
 if $YPANEL_EXISTS; then
     echo ""
     printf '%b' "${YELLOW}是否删除 ypanel 用户（包括 /home/ypanel）？${NC} (y/N): "
-    read -r confirm_user
+    READ_CMD confirm_user
     if [[ "$confirm_user" =~ ^[Yy]$ ]]; then
         # 确保所有进程已终止
         pkill -u ypanel 2>/dev/null || true
