@@ -520,8 +520,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, computed, watch } from 'vue';
-import TerminalTab from './TerminalTab.vue';
+import { defineComponent, reactive, ref, computed, watch, defineAsyncComponent } from 'vue';
+
+const TerminalTab = defineAsyncComponent(() => import('./TerminalTab.vue'));
 
 // ── CSRF Token（运行时内存，不自 localStorage） ──
 let _csrfToken: string | null = null;

@@ -67,7 +67,7 @@ app.use((req, res, next) => {
   if (pathname === entry || pathname === entry + '/' ||
       decodedPathname === entry || decodedPathname === entry + '/') {
     const token = crypto.randomUUID();
-    securityBypassTokens.add(token);
+    securityBypassTokens.set(token, Date.now());
     res.cookie(SECURITY_BYPASS_COOKIE, token, {
       httpOnly: true,
       sameSite: 'strict',
@@ -192,12 +192,17 @@ interface SessionEntry {
 }
 const sessions = new Map<string, SessionEntry>();
 
-/** 清理过期 session */
+/** 清理过期 session 和安全入口 bypass token */
 function cleanExpiredSessions(): void {
   const now = Date.now();
   for (const [token, entry] of sessions) {
     if (now - entry.createdAt > SESSION_TTL_MS) {
       sessions.delete(token);
+    }
+  }
+  for (const [token, createdAt] of securityBypassTokens) {
+    if (now - createdAt > SECURITY_BYPASS_TTL_MS) {
+      securityBypassTokens.delete(token);
     }
   }
 }
@@ -244,7 +249,8 @@ function getSessionCookie(req: http.IncomingMessage | express.Request): string |
 
 // ── 安全入口 bypass 令牌 ──
 const SECURITY_BYPASS_COOKIE = 'ypanel_security';
-const securityBypassTokens = new Set<string>();
+const securityBypassTokens = new Map<string, number>(); // token → 创建时间戳
+const SECURITY_BYPASS_TTL_MS = 60 * 60 * 1000; // 1 小时
 
 /** 检查客户端是否已绕过安全入口 */
 function isSecurityEntryBypassed(req: http.IncomingMessage): boolean {
@@ -252,7 +258,14 @@ function isSecurityEntryBypassed(req: http.IncomingMessage): boolean {
   const entry = settings.securityEntry?.trim();
   if (!entry || entry === '/') return true;
   const bypassToken = getCookie(req, SECURITY_BYPASS_COOKIE);
-  return !!(bypassToken && securityBypassTokens.has(bypassToken));
+  if (!bypassToken) return false;
+  const createdAt = securityBypassTokens.get(bypassToken);
+  if (!createdAt) return false;
+  if (Date.now() - createdAt > SECURITY_BYPASS_TTL_MS) {
+    securityBypassTokens.delete(bypassToken);
+    return false;
+  }
+  return true;
 }
 
 // ── 初始化认证（首次运行时生成） ──
