@@ -37,11 +37,25 @@ A web panel for Minecraft server.
 
 ## 运行
 
-无论如何，先确保有Node.js环境。请[安装好Node.js环境](https://nodejs.org/zh-cn/download)。
+**一键脚本：**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cygbs/YPanel/refs/heads/main/scripts/install.sh | sudo bash
+```
+
+这个脚本目前需要使用systemd的功能，如果你的系统没有，请使用下面的手动方式，并自己编写启动脚本。使用一键脚本时，请确保你的网络连接畅通。
+
+**一键卸载：**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cygbs/YPanel/refs/heads/main/scripts/uninstall.sh | sudo bash
+```
+
+卸载脚本只能卸载使用安装脚本安装的YPanel，其余情况可能无法处理。
 
 **手动方式：**
 
-从[Releases](https://github.com/cygbs/YPanel/releases)下载`YPanel.zip`，解压之后，`dist`是`Hub`部分，`dist-node`是`Node`部分，需要配合使用。
+先确保有Node.js环境，请[安装好Node.js环境](https://nodejs.org/zh-cn/download)。从[Releases](https://github.com/cygbs/YPanel/releases)下载`YPanel.zip`，解压之后，`dist`是`Hub`部分，`dist-node`是`Node`部分，需要配合使用。
 
 启动方法是，先进入`dist`目录执行`node index.js`启动Hub，然后在Hub中添加并获取Node端的启动命令，接着在`dist-node`文件夹中运行Node端启动命令，很快节点就能够连接上。
 
