@@ -310,7 +310,18 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
       } else {
         mp.pty.write(stopCmd + '\r');
       }
-      // 不设置超时强制杀死，让用户手动决定何时强制停止
+      // ^C 仅杀死 shell 的前台进程，shell 本身仍存活，onExit 不会触发
+      // 通过 stats() 检测前台进程是否已退出（只剩 shell），退出则清理
+      const stopPoll = setInterval(() => {
+        const proc = managedProcesses.get(id);
+        if (!proc) { clearInterval(stopPoll); return; }
+        const s = proc.pty.stats();
+        if (s && s.count <= 1) {
+          // 只剩 shell，前台进程已退出 → 杀死 shell 触发 onExit→process_exited
+          clearInterval(stopPoll);
+          proc.pty.kill();
+        }
+      }, 500);
       respond(200, { status: 'stop_sent' });
       return;
     }
