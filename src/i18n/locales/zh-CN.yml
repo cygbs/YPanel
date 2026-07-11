@@ -154,6 +154,7 @@ terminal:
   unavailable: 终端不可用（没有指定节点）。
   connection_closed: '[连接已关闭]'
   connection_error: '[连接发生错误]'
+  instance_stopped: '[实例已停止]'
 
 # ── 语言切换 ──
 lang:

@@ -154,6 +154,7 @@ terminal:
   unavailable: Terminal unavailable (no node specified).
   connection_closed: '[Connection closed]'
   connection_error: '[Connection error]'
+  instance_stopped: '[Instance stopped]'
 
 # ── Language ──
 lang:

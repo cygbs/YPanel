@@ -504,7 +504,7 @@ interface PendingRequest {
 }
 const pendingApiRequests = new Map<string, PendingRequest>();
 
-const terminalSessions = new Map<string, { ws: WebSocket; nodeId: number }>();
+const terminalSessions = new Map<string, { ws: WebSocket; nodeId: number; instanceId?: number | null }>();
 const uploadSessions = new Map<string, { ws: WebSocket; nodeId: number }>();
 
 function sendApiRequest(nodeId: number, method: string, path: string, body?: any): Promise<any> {
@@ -778,6 +778,15 @@ function handleLinkConnection(ws: WebSocket): void {
         const nid = wsToNodeId.get(ws);
         if (nid !== undefined) {
           broadcastEvent({ type: 'instance_status', nodeId: nid, instanceId: msg.instanceId, running: false });
+          // 通知所有连接到该实例的终端会话
+          for (const [termId, entry] of terminalSessions) {
+            if (entry.nodeId === nid && entry.instanceId === msg.instanceId) {
+              if (entry.ws.readyState === WebSocket.OPEN) {
+                entry.ws.send(JSON.stringify({ type: 'instance_stopped' }));
+              }
+              terminalSessions.delete(termId);
+            }
+          }
         }
         break;
       }
@@ -941,7 +950,7 @@ wss.on('connection', (ws: WebSocket, req) => {
   const instanceId = instanceIdStr ? parseInt(instanceIdStr, 10) : null;
   const termId = crypto.randomUUID();
 
-  terminalSessions.set(termId, { ws, nodeId });
+  terminalSessions.set(termId, { ws, nodeId, instanceId });
   console.log(`[tunnel] terminal: termId=${termId} node=#${nodeId} instanceId=${instanceId}`);
 
   linkWs.send(JSON.stringify({

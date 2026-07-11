@@ -138,6 +138,15 @@ export default defineComponent({
       });
 
       ws.addEventListener('message', (event: MessageEvent<string>) => {
+        // 检查结构化 JSON 控制消息（如实例停止通知）
+        try {
+          const json = JSON.parse(event.data);
+          if (json.type === 'instance_stopped') {
+            terminal?.write('\r\n\x1b[31m' + t('terminal.instance_stopped') + '\x1b[0m\r\n');
+            setTimeout(() => ws?.close(), 3000);
+            return;
+          }
+        } catch { /* 不是 JSON，当作普通终端输出 */ }
         enqueueWrite(event.data);
       });
 

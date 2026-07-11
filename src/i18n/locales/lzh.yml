@@ -154,6 +154,7 @@ terminal:
   unavailable: 終端不可用（未指定節點）。
   connection_closed: '[連已斷]'
   connection_error: '[連有誤]'
+  instance_stopped: '[實例已止]'
 
 # ── 語言 ──
 lang:
