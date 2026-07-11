@@ -1,4 +1,6 @@
 /**
+ * 本源代码文件是YPanel项目的一部分，版权所有 (C) cygbs 2026。本项目遵循AGPL-3.0-or-later许可证。
+ *
  * YPanel Hub — 中央面板服务器
  *
  * 职责：
