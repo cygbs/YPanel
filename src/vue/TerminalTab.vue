@@ -4,7 +4,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUnmounted, watch, type PropType } from 'vue';
+import { defineComponent, ref, onMounted, onUnmounted, watch, inject, type PropType } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -20,6 +20,7 @@ export default defineComponent({
   },
   setup(props, { expose }) {
     const { t } = useI18n();
+    const closeTab = inject<(id: number) => void>('closeTab')!;
     const terminalRef = ref<HTMLElement | null>(null);
     let terminal: Terminal | null = null;
     let fitAddon: FitAddon | null = null;
@@ -101,6 +102,12 @@ export default defineComponent({
 
       ws.addEventListener('close', () => {
         if (intentionalClose) return;
+        // 一次性终端（如文件编辑）：不重连，直接关闭标签页
+        const isOneShot = props.instanceId === null && props.initCommands.length > 0;
+        if (isOneShot) {
+          closeTab(props.tabId);
+          return;
+        }
         if (reconnectAttempts < MAX_RECONNECT) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
           terminal?.write('\r\n\x1b[33mReconnecting in ' + Math.round(delay / 1000) + 's...\x1b[0m\r\n');

@@ -12,7 +12,7 @@
           :class="{ active: tab.id === activeId }"
           @click="switchTab(tab.id)" @mousedown.middle="closeTab(tab.id)">
           <span class="tab-label">{{ tab.title }}</span>
-          <span v-if="tab.type === 'terminal'" class="tab-close"
+          <span v-if="tab.type !== 'home'" class="tab-close"
             @click.stop="closeTab(tab.id)" :title="$t('tab.close')">&times;</span>
         </div>
       </div>
@@ -28,6 +28,11 @@
           :tab-id="tab.id" :is-active="tab.id === activeId"
           :init-commands="tab.initCommands || []"
           :instance-id="tab.instanceId ?? null" :node-id="tab.nodeId ?? null" />
+      </div>
+      <div v-for="tab in fileManagerTabs" v-show="tab.id === activeId"
+        :key="tab.id" class="terminal-wrapper">
+        <FileManagerTab :tab-id="tab.id" :is-active="tab.id === activeId"
+          :node-id="tab.nodeId ?? null" :init-path="tab.initPath || ''" />
       </div>
     </div>
 
@@ -54,6 +59,7 @@ import LangDialog from './LangDialog.vue';
 import ToastContainer from './ToastContainer.vue';
 
 const TerminalTab = defineAsyncComponent(() => import('./TerminalTab.vue'));
+const FileManagerTab = defineAsyncComponent(() => import('./FileManagerTab.vue'));
 
 // ── CSRF Token ──
 let _csrfToken: string | null = null;
@@ -68,8 +74,9 @@ function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
 }
 
 interface TabData {
-  id: number; title: string; type: 'home' | 'terminal';
+  id: number; title: string; type: 'home' | 'terminal' | 'filemanager';
   initCommands?: string[]; instanceId?: number | null; nodeId?: number | null;
+  initPath?: string;
 }
 
 const AVAILABLE_ICONS = [
@@ -98,7 +105,7 @@ interface NewInstanceData {
 let nextTabId = 1;
 
 export default defineComponent({
-  components: { AuthScreen, HomeContent, NodeDialogs, InstanceDialogs, UploadDialog, HubSettingsDialog, LangDialog, ToastContainer, TerminalTab },
+  components: { AuthScreen, HomeContent, NodeDialogs, InstanceDialogs, UploadDialog, HubSettingsDialog, LangDialog, ToastContainer, TerminalTab, FileManagerTab },
   setup() {
     const { t, locale } = useI18n();
 
@@ -170,6 +177,7 @@ export default defineComponent({
     const activeId = ref(0);
     const tabRefs = ref<Record<number, any>>({});
     const terminalTabs = computed(() => tabs.filter(t => t.type === 'terminal'));
+    const fileManagerTabs = computed(() => tabs.filter(t => t.type === 'filemanager'));
 
     function setTabRef(tabId: number, el: any) { if (el) tabRefs.value[tabId] = el; }
     function addTerminalTab(title?: string, initCommands?: string[], instanceId?: number, nodeId?: number): void {
@@ -187,6 +195,16 @@ export default defineComponent({
       if (activeId.value === id) activeId.value = tabs[Math.min(idx, tabs.length - 1)].id;
     }
     function switchTab(id: number): void { activeId.value = id; }
+
+    function openFileManager(initPath?: string): void {
+      if (activeNodeId.value === null) return;
+      const existing = tabs.find(t => t.type === 'filemanager' && t.nodeId === activeNodeId.value);
+      if (existing) { switchTab(existing.id); return; }
+      const id = nextTabId++;
+      const title = initPath ? initPath.replace(/^.*[\\/]/, '') || initPath : t('tab.filemanager');
+      tabs.push({ id, title, type: 'filemanager', nodeId: activeNodeId.value, initPath });
+      activeId.value = id;
+    }
 
     // ── 节点 ──
     const nodes = ref<any[]>([]);
@@ -325,7 +343,7 @@ export default defineComponent({
     const isEditingLocked = computed(() => isEditing.value && editingId.value !== null && !!runningStates[editingId.value]);
     const showSettings = ref(false);
     const savingSettings = ref(false);
-    const settings = reactive({ defaultShell: '' });
+    const settings = reactive({ defaultShell: '', textEditor: '' });
     const showDeleteConfirm = ref(false);
     const saving = ref(false);
     const errors = reactive<Record<string, boolean>>({});
@@ -457,12 +475,12 @@ export default defineComponent({
 
     async function openSettings(): Promise<void> {
       showSettings.value = true; const prefix = apiPrefix(); if (!prefix) { showSettings.value = false; return; }
-      try { const res = await apiFetch(prefix + '/settings'); if (res.ok) { const data = await res.json(); settings.defaultShell = data.defaultShell || ''; } } catch { /* */ }
+      try { const res = await apiFetch(prefix + '/settings'); if (res.ok) { const data = await res.json(); settings.defaultShell = data.defaultShell || ''; settings.textEditor = data.textEditor || ''; } } catch { /* */ }
     }
     function closeSettings() { showSettings.value = false; }
     async function saveSettings(): Promise<void> {
       savingSettings.value = true;
-      try { await apiFetch(apiPrefix() + '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ defaultShell: settings.defaultShell }) }); showSettings.value = false; }
+      try { await apiFetch(apiPrefix() + '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ defaultShell: settings.defaultShell, textEditor: settings.textEditor }) }); showSettings.value = false; }
       catch { /* */ } finally { savingSettings.value = false; }
     }
 
@@ -696,6 +714,7 @@ export default defineComponent({
     provide('tabs', tabs); provide('activeId', activeId); provide('terminalTabs', terminalTabs);
     provide('addTerminalTab', addTerminalTab); provide('closeTab', closeTab); provide('switchTab', switchTab);
     provide('setTabRef', setTabRef); provide('tabRefs', tabRefs);
+    provide('fileManagerTabs', fileManagerTabs); provide('openFileManager', openFileManager);
 
     // 语言 + 通知 + 杂项
     provide('showLangDialog', showLangDialog); provide('localeCodes', localeCodes);
@@ -709,8 +728,8 @@ export default defineComponent({
     provide('apiPrefix', apiPrefix); provide('apiFetch', apiFetch);
 
     return {
-      authState, tabs, activeId, terminalTabs, activeNodeId,
-      addTerminalTab, closeTab, switchTab, setTabRef,
+      authState, tabs, activeId, terminalTabs, fileManagerTabs, activeNodeId,
+      addTerminalTab, closeTab, switchTab, setTabRef, openFileManager,
     };
   },
 });

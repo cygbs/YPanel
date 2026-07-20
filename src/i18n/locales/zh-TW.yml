@@ -34,11 +34,13 @@ tab:
   new: 新分頁
   close: 關閉
   terminal: 終端機 {id}
+  filemanager: 檔案管理
 
 # ── 快捷操作列 ──
 quick:
   new_instance: 新增實例
   upload_file: 上傳檔案…
+  file_manager: 檔案管理…
   settings: 設定
   back_to_nodes: 返回節點列表
   add_node: 新增節點…
@@ -122,6 +124,8 @@ node_settings:
   title: 設定 — {name}
   default_shell: 預設 Shell
   shell_placeholder: 留空則自動偵測
+  text_editor: 文字編輯器
+  editor_placeholder: 例如 vim、nano、micro
 
 # ── Hub 設定 ──
 hub_settings:
@@ -166,3 +170,29 @@ lang:
 notification:
   node_offline: 節點已斷線。
   copy_success: 複製成功。
+
+# ── 檔案管理 ──
+fm:
+  name: 名稱
+  size: 大小
+  modified: 修改時間
+  go_up: 上級目錄
+  mkdir: 新增資料夾
+  mkdir_placeholder: 資料夾名稱
+  mkdir_failed: 新增資料夾失敗
+  upload: 上傳檔案
+  upload_complete: 上傳完成
+  upload_failed: 上傳失敗
+  refresh: 重新整理
+  rename: 重新命名
+  rename_placeholder: 新名稱
+  rename_failed: 重新命名失敗
+  download: 下載
+  download_failed: 下載失敗
+  edit: 編輯
+  edit_title: 編輯 {name}
+  delete: 刪除
+  delete_file_confirm: 確定刪除檔案「{name}」？
+  delete_dir_confirm: 確定刪除資料夾「{name}」？內含檔案將一併刪除
+  delete_failed: 刪除失敗
+  empty: 此目錄為空

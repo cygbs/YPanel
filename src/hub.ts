@@ -649,6 +649,38 @@ app.put('/api/node/:nodeId/settings', mutationLimiter, async (req, res) => {
   catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
 });
 
+// ── 文件管理隧道 ──
+app.get('/api/node/:nodeId/files', async (req, res) => {
+  const filePath = (req.query.path as string) || '';
+  try {
+    const qs = filePath ? `?path=${encodeURIComponent(filePath)}` : '';
+    res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', `/api/files${qs}`));
+  } catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+});
+
+app.get('/api/node/:nodeId/files/download', async (req, res) => {
+  const filePath = (req.query.path as string) || '';
+  try {
+    const qs = filePath ? `?path=${encodeURIComponent(filePath)}` : '';
+    res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', `/api/files/download${qs}`));
+  } catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+});
+
+app.post('/api/node/:nodeId/files/delete', mutationLimiter, async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', '/api/files/delete', req.body)); }
+  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+});
+
+app.post('/api/node/:nodeId/files/rename', mutationLimiter, async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', '/api/files/rename', req.body)); }
+  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+});
+
+app.post('/api/node/:nodeId/files/mkdir', mutationLimiter, async (req, res) => {
+  try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', '/api/files/mkdir', req.body)); }
+  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+});
+
 // ═══════════════════════════════════════════════════
 // /link WebSocket：节点接入
 // ═══════════════════════════════════════════════════

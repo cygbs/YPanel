@@ -34,11 +34,13 @@ tab:
   new: 新标签页
   close: 关闭
   terminal: 终端 {id}
+  filemanager: 文件管理
 
 # ── 快捷操作栏 ──
 quick:
   new_instance: 新建实例
   upload_file: 上传文件…
+  file_manager: 文件管理…
   settings: 设置
   back_to_nodes: 返回节点列表
   add_node: 新增节点…
@@ -122,6 +124,8 @@ node_settings:
   title: 设置 — {name}
   default_shell: 默认Shell
   shell_placeholder: 留空则自动检测
+  text_editor: 文本编辑器
+  editor_placeholder: 例如 vim、nano、micro
 
 # ── Hub 设置 ──
 hub_settings:
@@ -166,3 +170,29 @@ lang:
 notification:
   node_offline: 节点已断开。
   copy_success: 复制成功。
+
+# ── 文件管理器 ──
+fm:
+  name: 名称
+  size: 大小
+  modified: 修改时间
+  go_up: 上级目录
+  mkdir: 新建文件夹
+  mkdir_placeholder: 文件夹名
+  mkdir_failed: 创建文件夹失败
+  upload: 上传文件
+  upload_complete: 上传完成
+  upload_failed: 上传失败
+  refresh: 刷新
+  rename: 重命名
+  rename_placeholder: 新名称
+  rename_failed: 重命名失败
+  download: 下载
+  download_failed: 下载失败
+  edit: 编辑
+  edit_title: 编辑 {name}
+  delete: 删除
+  delete_file_confirm: 确定删除文件「{name}」？
+  delete_dir_confirm: 确定删除文件夹「{name}」？内含文件将一并删除
+  delete_failed: 删除失败
+  empty: 此目录为空

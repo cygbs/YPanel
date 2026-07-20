@@ -34,11 +34,13 @@ tab:
   new: 新標籤
   close: 闔
   terminal: 終端 {id}
+  filemanager: 文檔
 
 # ── 捷徑 ──
 quick:
   new_instance: 新立實例
   upload_file: 上傳文檔…
+  file_manager: 文檔管理…
   settings: 設定
   back_to_nodes: 歸節點列
   add_node: 新增節點…
@@ -122,6 +124,8 @@ node_settings:
   title: 設定 — {name}
   default_shell: 預設殼層
   shell_placeholder: 留空則自檢
+  text_editor: 文編器
+  editor_placeholder: 如 vim、nano、micro
 
 # ── Hub 設定 ──
 hub_settings:
@@ -166,3 +170,29 @@ lang:
 notification:
   node_offline: 節點已斷。
   copy_success: 抄功。
+
+# ── 文檔管理 ──
+fm:
+  name: 名
+  size: 大小
+  modified: 修時
+  go_up: 上級目錄
+  mkdir: 新建夾
+  mkdir_placeholder: 夾名
+  mkdir_failed: 建夾敗
+  upload: 上傳文檔
+  upload_complete: 上傳畢
+  upload_failed: 上傳敗
+  refresh: 新
+  rename: 易名
+  rename_placeholder: 新名
+  rename_failed: 易名敗
+  download: 下載
+  download_failed: 下載敗
+  edit: 編
+  edit_title: 編 {name}
+  delete: 刪
+  delete_file_confirm: 確刪文檔「{name}」乎？
+  delete_dir_confirm: 確刪夾「{name}」乎？內文皆去
+  delete_failed: 刪敗
+  empty: 此錄空

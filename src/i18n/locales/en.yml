@@ -34,11 +34,13 @@ tab:
   new: New Tab
   close: Close
   terminal: Terminal {id}
+  filemanager: Files
 
 # ── Quick Actions ──
 quick:
   new_instance: New Instance
   upload_file: Upload File…
+  file_manager: File Manager…
   settings: Settings
   back_to_nodes: Back to Nodes
   add_node: Add Node…
@@ -122,6 +124,8 @@ node_settings:
   title: Settings — {name}
   default_shell: Default Shell
   shell_placeholder: Leave empty for auto-detect
+  text_editor: Text Editor
+  editor_placeholder: e.g. vim, nano, micro
 
 # ── Hub Settings ──
 hub_settings:
@@ -166,3 +170,29 @@ lang:
 notification:
   node_offline: Node disconnected.
   copy_success: Copied.
+
+# ── File Manager ──
+fm:
+  name: Name
+  size: Size
+  modified: Modified
+  go_up: Parent Directory
+  mkdir: New Folder
+  mkdir_placeholder: Folder name
+  mkdir_failed: Failed to create folder
+  upload: Upload File
+  upload_complete: Upload complete
+  upload_failed: Upload failed
+  refresh: Refresh
+  rename: Rename
+  rename_placeholder: New name
+  rename_failed: Rename failed
+  download: Download
+  download_failed: Download failed
+  edit: Edit
+  edit_title: 'Edit {name}'
+  delete: Delete
+  delete_file_confirm: 'Delete file "{name}"?'
+  delete_dir_confirm: 'Delete folder "{name}"? All contents will be removed.'
+  delete_failed: Delete failed
+  empty: This folder is empty

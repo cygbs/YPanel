@@ -65,7 +65,7 @@ function writeInstances(data: InstanceData): void {
 
 function readSettings(): NodeSettings {
   ensureDataDir();
-  return readJSON(SETTINGS_FILE, { defaultShell: '' });
+  return readJSON(SETTINGS_FILE, { defaultShell: '', textEditor: '' });
 }
 
 function writeSettings(s: NodeSettings): void {
@@ -107,6 +107,12 @@ function registerProcess(
   pty.onExit(() => {
     managedProcesses.delete(instanceId);
     sendToHub({ type: 'process_exited', instanceId });
+    // 非托管终端（负 ID）退出时通知 Hub 关闭所有连接的浏览器 WS
+    if (instanceId < 0) {
+      for (const tid of entry.wsTermIds) {
+        sendToHub({ type: 'terminal_closed', termId: tid });
+      }
+    }
   });
   managedProcesses.set(instanceId, entry);
   return entry;
@@ -189,7 +195,9 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
     respond(status, { error });
   };
 
-  const parts = req.path.split('/').filter(Boolean);
+  const qIndex = req.path.indexOf('?');
+  const pathname = qIndex >= 0 ? req.path.slice(0, qIndex) : req.path;
+  const parts = pathname.split('/').filter(Boolean);
 
   try {
     // ── /api/instances ──
@@ -332,14 +340,135 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
       if (req.method === 'GET') {
         respond(200, readSettings());
       } else if (req.method === 'PUT') {
-        const { defaultShell } = req.body || {};
+        const { defaultShell, textEditor } = req.body || {};
         const s = readSettings();
         if (defaultShell !== undefined) s.defaultShell = defaultShell;
+        if (textEditor !== undefined) s.textEditor = textEditor;
         writeSettings(s);
         respond(200, s);
       } else {
         respondError(405, 'Method not allowed');
       }
+      return;
+    }
+
+    // ── /api/files?path=<path> ── 文件管理
+    if (parts.length >= 2 && parts[0] === 'api' && parts[1] === 'files') {
+      // 解析 query string
+      const qIndex = req.path.indexOf('?');
+      const qsStr = qIndex >= 0 ? req.path.slice(qIndex + 1) : '';
+      const query: Record<string, string> = {};
+      if (qsStr) {
+        for (const pair of qsStr.split('&')) {
+          const eqIndex = pair.indexOf('=');
+          if (eqIndex >= 0) {
+            query[decodeURIComponent(pair.slice(0, eqIndex))] = decodeURIComponent(pair.slice(eqIndex + 1));
+          }
+        }
+      }
+
+      // 路径安全检查
+      const checkPath = (p: string): void => {
+        if (p.includes('..')) throw new Error('路径不能包含 ..');
+        if (!path.isAbsolute(p)) throw new Error('路径必须是绝对路径');
+      };
+
+      // GET /api/files?path=<dir> → 列出目录
+      if (req.method === 'GET' && parts.length === 2) {
+        try {
+          const dirPath = query.path || os.homedir();
+          checkPath(dirPath);
+          if (!fs.existsSync(dirPath)) { respondError(404, '路径不存在'); return; }
+          const stat = fs.statSync(dirPath);
+          if (!stat.isDirectory()) { respondError(400, '不是目录'); return; }
+          const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+          const files = entries.map(e => {
+            const fullPath = path.join(dirPath, e.name);
+            let fstat: fs.Stats | null = null;
+            try { fstat = fs.statSync(fullPath); } catch { /* skip */ }
+            return {
+              name: e.name,
+              type: e.isDirectory() ? 'dir' : 'file',
+              size: fstat?.size ?? 0,
+              modified: fstat ? Math.floor(fstat.mtimeMs / 1000) : 0,
+            };
+          });
+          files.sort((a, b) => {
+            if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+            return a.name.localeCompare(b.name);
+          });
+          respond(200, { path: dirPath, files });
+        } catch (e: any) { respondError(400, e.message); }
+        return;
+      }
+
+      // GET /api/files/download?path=<file> → 下载文件（base64）
+      if (req.method === 'GET' && parts[2] === 'download') {
+        try {
+          const filePath = query.path || '';
+          checkPath(filePath);
+          if (!fs.existsSync(filePath)) { respondError(404, '文件不存在'); return; }
+          const stat = fs.statSync(filePath);
+          if (stat.isDirectory()) { respondError(400, '不能下载目录'); return; }
+          const MAX_SIZE = 100 * 1024 * 1024; // 100 MB
+          if (stat.size > MAX_SIZE) { respondError(413, '文件过大 (max 100MB)'); return; }
+          const content = fs.readFileSync(filePath);
+          respond(200, {
+            name: path.basename(filePath),
+            size: stat.size,
+            content: content.toString('base64'),
+            mime: 'application/octet-stream',
+          });
+        } catch (e: any) { respondError(400, e.message); }
+        return;
+      }
+
+      // POST /api/files/delete → 删除文件/文件夹
+      if (req.method === 'POST' && parts[2] === 'delete') {
+        try {
+          const { path: targetPath } = req.body || {};
+          checkPath(targetPath);
+          if (!fs.existsSync(targetPath)) { respondError(404, '路径不存在'); return; }
+          const stat = fs.statSync(targetPath);
+          if (stat.isDirectory()) fs.rmSync(targetPath, { recursive: true, force: true });
+          else fs.unlinkSync(targetPath);
+          respond(200, { ok: true });
+        } catch (e: any) { respondError(500, e.message); }
+        return;
+      }
+
+      // POST /api/files/rename → 重命名
+      if (req.method === 'POST' && parts[2] === 'rename') {
+        try {
+          const { path: targetPath, newName } = req.body || {};
+          if (!newName) { respondError(400, 'newName is required'); return; }
+          if (newName.includes('/') || newName.includes('\\')) { respondError(400, 'newName 不能包含路径分隔符'); return; }
+          checkPath(targetPath);
+          if (!fs.existsSync(targetPath)) { respondError(404, '路径不存在'); return; }
+          const newPath = path.join(path.dirname(targetPath), newName);
+          if (fs.existsSync(newPath)) { respondError(409, '目标已存在'); return; }
+          fs.renameSync(targetPath, newPath);
+          respond(200, { ok: true, newPath });
+        } catch (e: any) { respondError(500, e.message); }
+        return;
+      }
+
+      // POST /api/files/mkdir → 创建文件夹
+      if (req.method === 'POST' && parts[2] === 'mkdir') {
+        try {
+          const { path: parentPath, name } = req.body || {};
+          if (!name) { respondError(400, 'name is required'); return; }
+          if (name.includes('/') || name.includes('\\')) { respondError(400, 'name 不能包含路径分隔符'); return; }
+          checkPath(parentPath || os.homedir());
+          const newPath = path.join(parentPath || os.homedir(), name);
+          if (fs.existsSync(newPath)) { respondError(409, '已存在'); return; }
+          fs.mkdirSync(newPath, { recursive: true });
+          respond(200, { ok: true, path: newPath });
+        } catch (e: any) { respondError(500, e.message); }
+        return;
+      }
+
+      respondError(405, 'Method not allowed');
       return;
     }
 

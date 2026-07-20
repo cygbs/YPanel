@@ -72,6 +72,11 @@
           <input v-model="settings.defaultShell" type="text" class="input mono"
             :placeholder="$t('node_settings.shell_placeholder')" />
         </label>
+        <label class="field">
+          <span class="field-label">{{ $t('node_settings.text_editor') }}</span>
+          <input v-model="settings.textEditor" type="text" class="input mono"
+            :placeholder="$t('node_settings.editor_placeholder')" />
+        </label>
       </div>
       <div class="dialog-actions">
         <button class="btn btn-secondary" @click="closeSettings">{{ $t('cancel') }}</button>

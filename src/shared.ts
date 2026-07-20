@@ -22,6 +22,7 @@ export interface InstanceData {
 
 export interface NodeSettings {
   defaultShell: string;
+  textEditor: string;
 }
 
 // ── IO 工具 ──

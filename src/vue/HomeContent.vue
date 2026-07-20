@@ -4,7 +4,7 @@
     <div class="quick-actions">
       <template v-if="activeNodeId !== null">
         <button @click="openNewInstance">{{ $t('quick.new_instance') }}</button>
-        <button @click="openUploadDialog">{{ $t('quick.upload_file') }}</button>
+        <button @click="openFileManager()">{{ $t('quick.file_manager') }}</button>
         <button @click="openSettings">{{ $t('quick.settings') }}</button>
         <button @click="leaveNode" class="qa-back">{{ $t('quick.back_to_nodes') }}</button>
       </template>
@@ -107,6 +107,7 @@ export default defineComponent({
       selectNode: inject('selectNode')!,
       selectInstance: inject('selectInstance')!,
       openNewInstance: inject('openNewInstance')!,
+      openFileManager: inject('openFileManager')!,
       openUploadDialog: inject('openUploadDialog')!,
       openSettings: inject('openSettings')!,
       openNodeDialog: inject('openNodeDialog')!,
