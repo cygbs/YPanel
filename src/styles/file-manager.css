@@ -83,14 +83,14 @@
 /* size/modified/actions 列宽由 Vue 动态控制，以下为默认值 */
 .fm-col-size { width: 90px; }
 .fm-col-modified { width: 140px; }
-.fm-col-act { width: 200px; text-align: right !important; }
+.fm-col-act { width: 200px; text-align: left !important; }
 .fm-cell-name { display: flex; align-items: center; gap: 0; }
 .fm-cell-num {
   font-family: Menlo, Monaco, 'Courier New', monospace;
   font-size: 11px !important;
   color: #888 !important;
 }
-.fm-cell-act { text-align: right !important; white-space: nowrap; }
+.fm-cell-act { text-align: left !important; white-space: nowrap; }
 .fm-cell-act .fm-act-btn + .fm-act-btn { margin-left: 2px; }
 .fm-act-btn {
   height: 22px;
