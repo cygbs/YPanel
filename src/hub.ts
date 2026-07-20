@@ -493,6 +493,16 @@ const browserEventClients = new Set<WebSocket>();
 /** Node WebSocket → nodeId 反向映射 */
 const wsToNodeId = new Map<WebSocket, number>();
 
+/** 节点 API 返回的错误（非连接/超时问题） */
+class NodeApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'NodeApiError';
+    this.status = status;
+  }
+}
+
 interface PendingRequest {
   resolve: (value: any) => void;
   reject: (reason: any) => void;
@@ -655,7 +665,10 @@ app.get('/api/node/:nodeId/files', async (req, res) => {
   try {
     const qs = filePath ? `?path=${encodeURIComponent(filePath)}` : '';
     res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', `/api/files${qs}`));
-  } catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  } catch (e: any) {
+    if (e instanceof NodeApiError) { res.status(e.status).json({ error: e.message }); }
+    else { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  }
 });
 
 app.get('/api/node/:nodeId/files/download', async (req, res) => {
@@ -663,22 +676,34 @@ app.get('/api/node/:nodeId/files/download', async (req, res) => {
   try {
     const qs = filePath ? `?path=${encodeURIComponent(filePath)}` : '';
     res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', `/api/files/download${qs}`));
-  } catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  } catch (e: any) {
+    if (e instanceof NodeApiError) { res.status(e.status).json({ error: e.message }); }
+    else { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  }
 });
 
 app.post('/api/node/:nodeId/files/delete', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', '/api/files/delete', req.body)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e: any) {
+    if (e instanceof NodeApiError) { res.status(e.status).json({ error: e.message }); }
+    else { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  }
 });
 
 app.post('/api/node/:nodeId/files/rename', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', '/api/files/rename', req.body)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e: any) {
+    if (e instanceof NodeApiError) { res.status(e.status).json({ error: e.message }); }
+    else { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  }
 });
 
 app.post('/api/node/:nodeId/files/mkdir', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', '/api/files/mkdir', req.body)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e: any) {
+    if (e instanceof NodeApiError) { res.status(e.status).json({ error: e.message }); }
+    else { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  }
 });
 
 // ═══════════════════════════════════════════════════
@@ -768,7 +793,7 @@ function handleLinkConnection(ws: WebSocket): void {
         if (pending) {
           clearTimeout(pending.timer);
           if (msg.status && msg.status >= 400) {
-            pending.reject(new Error(msg.error || `API error: ${msg.status}`));
+            pending.reject(new NodeApiError(msg.status, msg.error || `API error: ${msg.status}`));
           } else {
             pending.resolve(msg.data);
             // ── 根据 API 路径广播状态变更 ──

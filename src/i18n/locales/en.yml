@@ -197,3 +197,5 @@ fm:
   delete_dir_confirm: 'Delete folder "{name}"? All contents will be removed.'
   delete_failed: Delete failed
   empty: This folder is empty
+  access_denied: Permission denied
+  list_failed: 'Failed to list directory: {error}'

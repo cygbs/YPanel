@@ -197,3 +197,5 @@ fm:
   delete_dir_confirm: 確定刪除資料夾「{name}」？內含檔案將一併刪除
   delete_failed: 刪除失敗
   empty: 此目錄為空
+  access_denied: 無權存取此目錄
+  list_failed: '載入目錄失敗：{error}'

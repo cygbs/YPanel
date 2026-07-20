@@ -78,9 +78,6 @@
 
     <!-- 加载中 -->
     <div v-if="loading" class="fm-loading">{{ $t('loading') }}</div>
-
-    <!-- 错误 -->
-    <div v-if="error" class="fm-error">{{ error }}</div>
   </div>
 </template>
 
@@ -115,7 +112,6 @@ export default defineComponent({
     const files = ref<FileEntry[]>([]);
     const selectedName = ref('');
     const loading = ref(false);
-    const error = ref('');
 
     // 新文件夹
     const mkdirVisible = ref(false);
@@ -141,14 +137,14 @@ export default defineComponent({
 
     async function listDir(p: string): Promise<void> {
       loading.value = true;
-      error.value = '';
       try {
         const url = buildApi('/files') + '?path=' + encodeURIComponent(p);
         const res = await apiFetch(url);
         if (!res.ok) {
           const data = await res.json().catch(() => ({ error: 'unknown' }));
-          error.value = data.error || `HTTP ${res.status}`;
-          files.value = [];
+          const errMsg: string = data.error || `HTTP ${res.status}`;
+          const isAccessDenied = /EACCES|permission denied|Permission denied/i.test(errMsg);
+          showNotification(isAccessDenied ? t('fm.access_denied') : t('fm.list_failed', { error: errMsg }), 'error');
           return;
         }
         const data = await res.json();
@@ -157,8 +153,7 @@ export default defineComponent({
         files.value = data.files || [];
         selectedName.value = '';
       } catch (e: any) {
-        error.value = e.message || 'network error';
-        files.value = [];
+        showNotification(e.message || t('network_error'), 'error');
       } finally {
         loading.value = false;
         initialLoad.value = true;
@@ -368,7 +363,7 @@ export default defineComponent({
     }
 
     return {
-      currentPath, addrPath, addrInput, files, selectedName, loading, error,
+      currentPath, addrPath, addrInput, files, selectedName, loading,
       mkdirVisible, mkdirName, mkdirInput, doMkdir, showMkdir,
       renameTarget, renameName, renameInput, startRename, doRename,
       fileInput, triggerUpload, onFilePicked,

@@ -197,3 +197,5 @@ fm:
   delete_dir_confirm: 确定删除文件夹「{name}」？内含文件将一并删除
   delete_failed: 删除失败
   empty: 此目录为空
+  access_denied: 无权访问该目录
+  list_failed: '加载目录失败：{error}'

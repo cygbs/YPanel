@@ -197,3 +197,5 @@ fm:
   delete_dir_confirm: 確刪夾「{name}」乎？內文皆去
   delete_failed: 刪敗
   empty: 此錄空
+  access_denied: 無權入此錄
+  list_failed: '載錄敗：{error}'
