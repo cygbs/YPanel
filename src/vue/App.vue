@@ -198,8 +198,11 @@ export default defineComponent({
 
     function openFileManager(initPath?: string): void {
       if (activeNodeId.value === null) return;
-      const existing = tabs.find(t => t.type === 'filemanager' && t.nodeId === activeNodeId.value);
-      if (existing) { switchTab(existing.id); return; }
+      // 指定路径时总是新开标签页，不复用已有的（如从实例打开文件夹）
+      if (!initPath) {
+        const existing = tabs.find(t => t.type === 'filemanager' && t.nodeId === activeNodeId.value);
+        if (existing) { switchTab(existing.id); return; }
+      }
       const id = nextTabId++;
       const title = initPath ? initPath.replace(/^.*[\\/]/, '') || initPath : t('tab.filemanager');
       tabs.push({ id, title, type: 'filemanager', nodeId: activeNodeId.value, initPath });

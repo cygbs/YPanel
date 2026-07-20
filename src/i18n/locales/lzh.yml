@@ -64,6 +64,7 @@ instances:
   stop: 止
   force_stop: 強止
   open_terminal: 啟終端
+  open_folder: 啟目錄
   start_first: 請先啟實例。
   edit: 編
   delete: 刪實例

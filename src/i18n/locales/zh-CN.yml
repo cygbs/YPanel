@@ -64,6 +64,7 @@ instances:
   stop: 停止
   force_stop: 强制停止
   open_terminal: 打开终端
+  open_folder: 打开文件夹
   start_first: 请先启动实例。
   edit: 编辑
   delete: 删除实例

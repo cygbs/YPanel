@@ -74,6 +74,7 @@
                 :disabled="selectedInstance ? !runningStates[selectedInstance.id] && !stopRequested[selectedInstance.id] : true"
                 @click="stopInstance">{{ selectedInstance && stopRequested[selectedInstance.id] ? $t('instances.force_stop') : $t('instances.stop') }}</button>
               <button class="fm-btn" @click="openTerminal">{{ $t('instances.open_terminal') }}</button>
+              <button class="fm-btn" @click="openInstanceFolder">{{ $t('instances.open_folder') }}</button>
               <button class="fm-btn" @click="openEditInstance">{{ $t('instances.edit') }}</button>
               <button class="fm-btn fm-btn-danger" @click="openDeleteConfirm">{{ $t('instances.delete') }}</button>
             </div>
@@ -100,6 +101,12 @@ export default defineComponent({
     const runningStates = inject<any>('runningStates')!;
     const stopRequested = inject<any>('stopRequested')!;
 
+    const openFileManager = inject<(initPath?: string) => void>('openFileManager')!;
+    function openInstanceFolder(): void {
+      const inst = selectedInstance.value;
+      if (inst?.folder) openFileManager(inst.folder);
+    }
+
     return {
       nodes, activeNodeId, activeId, instances,
       selectedNodeId, selectedNodeForMenu, selectedInstance,
@@ -108,6 +115,7 @@ export default defineComponent({
       selectInstance: inject('selectInstance')!,
       openNewInstance: inject('openNewInstance')!,
       openFileManager: inject('openFileManager')!,
+      openInstanceFolder,
       openUploadDialog: inject('openUploadDialog')!,
       openSettings: inject('openSettings')!,
       openNodeDialog: inject('openNodeDialog')!,
