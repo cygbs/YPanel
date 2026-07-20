@@ -117,14 +117,15 @@
 .fm-resize-handle {
   position: absolute;
   left: 0;
-  top: 0;
-  bottom: 0;
+  top: 4px;
+  bottom: 4px;
   width: 5px;
   cursor: col-resize;
   user-select: none;
   z-index: 2;
+  border-left: 1px solid #444;
 }
 .fm-resize-handle:hover,
 .fm-resize-handle:active {
-  background: #6272a4;
+  border-left-color: #6272a4;
 }

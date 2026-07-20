@@ -157,7 +157,7 @@ export default defineComponent({
       if (!resizing.value) return;
       const delta = e.clientX - resizeStartX.value;
       const col = resizing.value;
-      colWidths.value[col] = Math.max(40, resizeStartWidth.value + delta);
+      colWidths.value[col] = Math.max(40, resizeStartWidth.value - delta);
     }
     function onResizeEnd(): void {
       resizing.value = null;
