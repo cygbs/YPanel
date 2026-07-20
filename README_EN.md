@@ -26,8 +26,10 @@ This is a simple web panel suitable for Minecraft servers, or any other programs
 | Loading speed | ✗ | ✓ |
 | Docs | ✓ | ✗ |
 | API | ✓ | ✗ |
-| Node terminal | ✓ | ✓ (more convenient) |
+| Node terminal | ✓ | ✓ |
 | Instance/template market | ✓ | ✗ |
+| File management | ✓ | ✓ |
+| UI customization | ✓ | ✗ |
 | One-click script | ✓ | ✓ |
 | Security entrance | ✗ | ✓ |
 | Size | ✗ | ✓ |
@@ -75,7 +77,6 @@ npm run build
 - Implement plugin system.
 - Improve documentation.
 - Provide a simple and clear external API for easy integration with other programs.
-- Provide one-click installation script.
 - Use [Bubblewrap](https://github.com/containers/bubblewrap) to provide container functionality instead of Docker. This panel will not support Docker, as the author believes it is not well-suited for MC servers.
 
 ## License
