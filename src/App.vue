@@ -79,7 +79,7 @@
             <button @click="openNodeDialog">{{ $t('quick.add_node') }}</button>
             <button @click="openHubSettings">{{ $t('quick.hub_settings') }}</button>
           </template>
-          <button>{{ $t('quick.help') }}</button>
+          <button @click="openHelp">{{ $t('quick.help') }}</button>
           <button @click="cycleLocale" class="lang-btn">{{ $t('lang.title') }}</button>
           <button @click="doLogout" class="qa-back" style="margin-left:auto">{{ $t('quick.logout') }}</button>
         </div>
@@ -1627,6 +1627,10 @@ function dblclickNode(node: any): void {
       openLangDialog();
     }
 
+    function openHelp(): void {
+      window.open('https://github.com/cygbs/YPanel/wiki', '_blank', 'noopener,noreferrer');
+    }
+
     // 切换语言时更新已存在的标签页标题
     watch(locale, () => {
       for (const tab of tabs) {
@@ -1661,7 +1665,7 @@ function dblclickNode(node: any): void {
       showNodeDeleteConfirm, pendingDeleteNodeId,
       openNodeDelete, cancelNodeDelete, confirmNodeDelete,
       cycleLocale, showLangDialog, localeCodes, locale, messages,
-      openLangDialog, closeLangDialog, setLang,
+      openLangDialog, closeLangDialog, setLang, openHelp,
       // 实例管理
       instances, selectedInstance, selectedId, selectInstance,
       runningStates, stopRequested, showNewDialog, isEditing, isEditingLocked,
