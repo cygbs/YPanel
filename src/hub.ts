@@ -21,6 +21,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
+import { readJSON, writeJSON } from './shared.js';
 
 const BCRYPT_ROUNDS = 12;
 const SESSION_TTL_MS = 3 * 60 * 60 * 1000; // 3 小时
@@ -142,14 +143,12 @@ function randomPassword(len = 12): string {
 
 function readAuth(): AuthData | null {
   ensureDataDir();
-  if (!fs.existsSync(AUTH_FILE)) return null;
-  try { return JSON.parse(fs.readFileSync(AUTH_FILE, 'utf-8')); }
-  catch { return null; }
+  return readJSON<AuthData | null>(AUTH_FILE, null);
 }
 
 function writeAuth(data: AuthData): void {
   ensureDataDir();
-  fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  writeJSON(AUTH_FILE, data);
 }
 
 // ═══════════════════════════════════════════════════
@@ -170,14 +169,12 @@ function defaultHubSettings(): HubSettings {
 
 function readHubSettings(): HubSettings {
   ensureDataDir();
-  if (!fs.existsSync(HUB_SETTINGS_FILE)) return defaultHubSettings();
-  try { return JSON.parse(fs.readFileSync(HUB_SETTINGS_FILE, 'utf-8')); }
-  catch { return defaultHubSettings(); }
+  return readJSON(HUB_SETTINGS_FILE, defaultHubSettings());
 }
 
 function writeHubSettings(data: HubSettings): void {
   ensureDataDir();
-  fs.writeFileSync(HUB_SETTINGS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  writeJSON(HUB_SETTINGS_FILE, data);
 }
 
 /** 首次运行：生成随机密码 */
@@ -545,14 +542,12 @@ interface NodesData {
 
 function readNodes(): NodesData {
   ensureDataDir();
-  if (!fs.existsSync(NODES_FILE)) return { nodes: [] };
-  try { return JSON.parse(fs.readFileSync(NODES_FILE, 'utf-8')); }
-  catch { return { nodes: [] }; }
+  return readJSON(NODES_FILE, { nodes: [] });
 }
 
 function writeNodes(data: NodesData): void {
   ensureDataDir();
-  fs.writeFileSync(NODES_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  writeJSON(NODES_FILE, data);
 }
 
 app.get('/api/nodes', (_req, res) => { res.json(readNodes()); });
@@ -564,7 +559,7 @@ app.post('/api/nodes', mutationLimiter, (req, res) => {
   const nodeName = name || (lang === 'zh-CN' ? `节点 ${data.nodes.length + 1}` : `Node ${data.nodes.length + 1}`);
   const now = new Date().toISOString();
   data.nodes.push({
-    id: data.nodes.length > 0 ? Math.max(...data.nodes.map((n: any) => n.id)) + 1 : 0,
+    id: data.nodes.length > 0 ? Math.max(...data.nodes.map(n => n.id)) + 1 : 0,
     name: nodeName,
     token,
     connected: false,
@@ -578,7 +573,7 @@ app.delete('/api/nodes/:id', mutationLimiter, (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
   const data = readNodes();
-  const idx = data.nodes.findIndex((n: any) => n.id === id);
+  const idx = data.nodes.findIndex(n => n.id === id);
   if (idx === -1) { res.status(404).json({ error: 'not found' }); return; }
   data.nodes.splice(idx, 1);
   writeNodes(data);
@@ -591,7 +586,7 @@ app.put('/api/nodes/:id', mutationLimiter, (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
   const data = readNodes();
-  const node = data.nodes.find((n: any) => n.id === id);
+  const node = data.nodes.find(n => n.id === id);
   if (!node) { res.status(404).json({ error: 'not found' }); return; }
   const { name, icon } = req.body;
   if (name !== undefined) node.name = name;
@@ -715,7 +710,7 @@ function handleLinkConnection(ws: WebSocket): void {
     switch (msg.type) {
       case 'register': {
         const data = readNodes();
-        const existing = data.nodes.find((n: any) => n.token === msg.token);
+        const existing = data.nodes.find(n => n.token === msg.token);
         if (existing) {
           const nodeName = existing.name;
           const now = new Date().toISOString();

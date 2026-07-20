@@ -17,6 +17,7 @@ import { spawn, type IPty } from 'zigpty';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { readJSON, writeJSON, type Instance, type InstanceData, type NodeSettings } from './shared.js';
 
 // ── CLI 参数 ──
 const args: Record<string, string> = {};
@@ -27,6 +28,11 @@ for (let i = 2; i < process.argv.length; i += 2) {
 }
 const HUB_URL = args.s || args.S || '';
 const TOKEN = args.t || args.T || '';
+
+// ── 常量 ──
+const TERM_COLS = 80;
+const TERM_ROWS = 24;
+const MAX_OUTPUT_BUFFER = 2000;
 
 if (!HUB_URL || !TOKEN) {
   console.error('Usage: node index.js -s <hub-ws-url> -t <token>');
@@ -47,28 +53,24 @@ function ensureDataDir(): void {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-function readInstances(): { instances: any[] } {
+function readInstances(): InstanceData {
   ensureDataDir();
-  if (!fs.existsSync(INSTANCES_FILE)) return { instances: [] };
-  try { return JSON.parse(fs.readFileSync(INSTANCES_FILE, 'utf-8')); }
-  catch { return { instances: [] }; }
+  return readJSON(INSTANCES_FILE, { instances: [] });
 }
 
-function writeInstances(data: { instances: any[] }): void {
+function writeInstances(data: InstanceData): void {
   ensureDataDir();
-  fs.writeFileSync(INSTANCES_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  writeJSON(INSTANCES_FILE, data);
 }
 
-function readSettings(): { defaultShell: string } {
+function readSettings(): NodeSettings {
   ensureDataDir();
-  if (!fs.existsSync(SETTINGS_FILE)) return { defaultShell: '' };
-  try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')); }
-  catch { return { defaultShell: '' }; }
+  return readJSON(SETTINGS_FILE, { defaultShell: '' });
 }
 
-function writeSettings(s: any): void {
+function writeSettings(s: NodeSettings): void {
   ensureDataDir();
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2), 'utf-8');
+  writeJSON(SETTINGS_FILE, s);
 }
 
 function getDefaultShell(): string | undefined {
@@ -78,7 +80,7 @@ function getDefaultShell(): string | undefined {
 /** 创建 PTY shell 进程 */
 function spawnShell(cwd: string): IPty {
   return spawn(getDefaultShell(), [], {
-    name: 'xterm-color', cols: 80, rows: 24,
+    name: 'xterm-color', cols: TERM_COLS, rows: TERM_ROWS,
     cwd,
     env: { ...process.env } as { [key: string]: string },
   });
@@ -92,12 +94,12 @@ function registerProcess(
 ): ManagedProcess {
   const entry: ManagedProcess = {
     pty, outputBuffer: [], wsTermIds,
-    resizeCols: 80, resizeRows: 24,
+    resizeCols: TERM_COLS, resizeRows: TERM_ROWS,
   };
   pty.onData((data: string | Buffer) => {
     const str = ptyDataToStr(data);
     entry.outputBuffer.push(str);
-    if (entry.outputBuffer.length > 2000) entry.outputBuffer.shift();
+    if (entry.outputBuffer.length > MAX_OUTPUT_BUFFER) entry.outputBuffer.shift();
     for (const tid of entry.wsTermIds) {
       sendToHub({ type: 'terminal_data', termId: tid, data: str });
     }
@@ -121,8 +123,8 @@ interface ManagedProcess {
 
 const managedProcesses = new Map<number, ManagedProcess>();
 
-function getInstanceById(id: number): any {
-  return readInstances().instances.find((i: any) => i.id === id) || null;
+function getInstanceById(id: number): Instance | null {
+  return readInstances().instances.find(i => i.id === id) || null;
 }
 
 /** 将 PTY 输出的 data 转为字符串 */
@@ -198,7 +200,7 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
         const { name, uuid, icon, command, folder, stopCommand, autoStart } = req.body || {};
         if (!name || !uuid) { respondError(400, 'name and uuid are required'); return; }
         const data = readInstances();
-        const nextId = data.instances.length > 0 ? Math.max(...data.instances.map((i: any) => i.id)) + 1 : 0;
+        const nextId = data.instances.length > 0 ? Math.max(...data.instances.map(i => i.id)) + 1 : 0;
         const instance = {
           id: nextId, name, uuid,
           icon: icon || 'grass.svg', command: command || '',
@@ -221,7 +223,7 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
 
       if (req.method === 'PUT') {
         const data = readInstances();
-        const idx = data.instances.findIndex((i: any) => i.id === id);
+        const idx = data.instances.findIndex(i => i.id === id);
         if (idx === -1) { respondError(404, 'not found'); return; }
         const existing = data.instances[idx];
         const { name, icon, command, folder, stopCommand, autoStart } = req.body || {};
@@ -238,7 +240,7 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
         const mp = managedProcesses.get(id);
         if (mp) { mp.pty.kill(); managedProcesses.delete(id); }
         const data = readInstances();
-        const idx = data.instances.findIndex((i: any) => i.id === id);
+        const idx = data.instances.findIndex(i => i.id === id);
         if (idx === -1) { respondError(404, 'not found'); return; }
         data.instances.splice(idx, 1);
         writeInstances(data);
@@ -263,36 +265,12 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
 
       let pty: IPty;
       try {
-        pty = spawn(getDefaultShell(), [], {
-          name: 'xterm-color', cols: 80, rows: 24,
-          cwd: inst.folder || os.homedir(),
-          env: { ...process.env } as { [key: string]: string },
-        });
+        pty = spawnShell(inst.folder || os.homedir());
       } catch (e: any) {
         respondError(500, `spawn failed: ${e.message}`);
         return;
       }
-
-      const entry: ManagedProcess = {
-        pty, outputBuffer: [], wsTermIds: new Set(),
-        resizeCols: 80, resizeRows: 24,
-      };
-
-      pty.onData((data: string | Buffer) => {
-        const str = ptyDataToStr(data);
-        entry.outputBuffer.push(str);
-        if (entry.outputBuffer.length > 2000) entry.outputBuffer.shift();
-        for (const termId of entry.wsTermIds) {
-          sendToHub({ type: 'terminal_data', termId, data: str });
-        }
-      });
-
-      pty.onExit(() => {
-        managedProcesses.delete(id);
-        sendToHub({ type: 'process_exited', instanceId: id });
-      });
-
-      managedProcesses.set(id, entry);
+      registerProcess(pty, id);
       pty.write(`cd "${inst.folder}"\r`);
       pty.write(`${inst.command}\r`);
       respond(200, { status: 'started', instanceId: id });

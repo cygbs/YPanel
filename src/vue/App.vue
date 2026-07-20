@@ -935,7 +935,8 @@ export default defineComponent({
       activeNodeId.value = id;
       showNodeDialog.value = false;
       await loadInstances();
-      pollStatus(); // 实例列表已加载，立即查一次状态，不等定时器
+      // 立即查询状态：节点注册时的 node_status 事件可能已错过
+      pollStatus();
     }
 
     function leaveNode(): void {
@@ -1544,7 +1545,7 @@ export default defineComponent({
         case 'instances_refresh': {
           if (activeNodeId.value === msg.nodeId) {
             loadInstances();
-            pollStatus(); // 新实例的绿点需要立即查
+            // 新建/编辑实例不改运行状态，无需 pollStatus
           }
           break;
         }
