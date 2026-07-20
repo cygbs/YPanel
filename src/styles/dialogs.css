@@ -1,0 +1,181 @@
+/* YPanel 全局样式 — 对话框 & 表单控件 */
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.dialog {
+  background: #1e1e3a;
+  border-radius: 10px;
+  width: 500px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+.dialog-sm { width: 400px; }
+.dialog-title {
+  padding: 16px 20px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+.dialog-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 20px 16px;
+}
+.delete-warning {
+  font-size: 13px;
+  color: #aaa;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* 表单 */
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field-label { font-size: 12px; color: #999; }
+.field-error { font-size: 11px; color: #ff5555; }
+.field-hint { font-size: 11px; color: #888; font-weight: normal; }
+.field-row { flex-direction: row !important; align-items: center !important; gap: 8px !important; }
+
+.input {
+  height: 34px;
+  padding: 0 10px;
+  background: #12122a;
+  border: 1px solid #2a2a4a;
+  border-radius: 5px;
+  color: #e0e0e0;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input:focus { border-color: #6272a4; }
+.input.invalid { border-color: #ff5555; }
+.input:disabled { opacity: 0.4; cursor: not-allowed; }
+.input.mono { font-family: Menlo, Monaco, 'Courier New', monospace; font-size: 12px; }
+.input[readonly] { color: #777; cursor: default; }
+
+.input-with-prefix {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  background: #12122a;
+  border: 1px solid #2a2a4a;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.input-with-prefix:focus-within { border-color: #6272a4; }
+.input-prefix {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  flex-shrink: 0;
+  color: #777;
+  font-size: 14px;
+  font-family: Menlo, Monaco, 'Courier New', monospace;
+  user-select: none;
+}
+.prefix-input {
+  flex: 1;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.textarea {
+  width: 100%;
+  padding: 10px;
+  background: #12122a;
+  border: 1px solid #2a2a4a;
+  border-radius: 5px;
+  color: #e0e0e0;
+  font-size: 12px;
+  font-family: Menlo, Monaco, 'Courier New', monospace;
+  outline: none;
+  resize: vertical;
+  line-height: 1.5;
+  transition: border-color 0.15s;
+}
+.textarea:focus { border-color: #6272a4; }
+
+.checkbox {
+  width: 16px; height: 16px;
+  accent-color: #50fa7b;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* 图标选择器 */
+.icon-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  background: #12122a;
+  border: 1px solid #2a2a4a;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.icon-selector:hover { border-color: #6272a4; }
+.icon-preview { width: 20px; height: 20px; }
+.icon-name { font-size: 12px; color: #aaa; }
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  padding: 10px;
+  background: #12122a;
+  border: 1px solid #2a2a4a;
+  border-radius: 5px;
+  margin-top: 4px;
+}
+.icon-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.icon-option:hover { background: #2a2a4a; }
+.icon-option.selected { background: #3a3a6a; }
+.icon-option img { width: 24px; height: 24px; }
+
+/* 按钮 */
+.btn {
+  height: 34px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 5px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-sm { height: 28px !important; padding: 0 12px !important; font-size: 12px !important; }
+.btn-secondary { background: #2a2a4a; color: #ccc; }
+.btn-secondary:hover { background: #3a3a5a; }
+.btn-primary { background: #50fa7b; color: #111; font-weight: 600; }
+.btn-primary:hover { background: #69ff94; }
+.btn-danger { background: #ff5555; color: #fff; font-weight: 600; }
+.btn-danger:hover { background: #ff6e6e; }
+.btn-warning { background: #ff8c00 !important; color: #fff !important; font-weight: 700; }
+.btn-warning:hover { background: #ff6a00 !important; }

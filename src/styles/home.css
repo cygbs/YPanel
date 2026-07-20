@@ -1,0 +1,162 @@
+/* YPanel 全局样式 — 主页（实例卡片 & 功能菜单） */
+
+.page-home {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.quick-actions {
+  height: 40px;
+  flex-shrink: 0;
+  background: #16162e;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+}
+.quick-actions button {
+  height: 28px;
+  padding: 0 14px;
+  background: #22224a;
+  border: none;
+  border-radius: 5px;
+  color: #ccc;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.quick-actions button:hover { background: #2e2e5a; color: #fff; }
+
+.home-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* 实例列表 */
+.instance-list {
+  flex: 1;
+  background: #12122a;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 120px);
+  grid-auto-rows: 140px;
+  gap: 8px;
+  padding: 12px;
+  align-content: start;
+}
+.instance-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: #161633;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.instance-card:hover { background: #1e1e42; }
+.instance-card.selected {
+  background: #1e1e4a;
+  box-shadow: 0 0 0 1px #6272a4;
+}
+.inst-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.inst-icon { width: 48px; height: 48px; }
+.status-dot {
+  position: absolute;
+  top: -3px; right: -3px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid #161633;
+}
+.status-dot.running { background: #50fa7b; }
+.status-dot.stopping { background: #ff5555; }
+.status-dot.offline { background: #ff5555; }
+.inst-name {
+  font-size: 12px;
+  color: #aaa;
+  text-align: center;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.no-instances-hint {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 13px;
+  padding: 40px 0;
+}
+
+/* 功能菜单 */
+.function-menu {
+  width: 230px;
+  flex-shrink: 0;
+  background: #1a1a32;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 12px;
+  gap: 8px;
+}
+.fm-icon {
+  width: 64px; height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #12122a;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.fm-icon:hover { background: #22224a; }
+.fm-icon img { width: 40px; height: 40px; }
+.fm-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+  text-align: center;
+  margin-bottom: 4px;
+}
+.fm-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fm-btn {
+  width: 100%;
+  height: 38px;
+  background: #22224a;
+  border: none;
+  border-radius: 6px;
+  color: #ccc;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.fm-btn:hover { background: #2e2e5a; color: #fff; }
+.fm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.fm-btn:disabled:hover { background: #22224a !important; color: #ccc !important; }
+.fm-empty {
+  color: #666;
+  font-size: 13px;
+  margin-top: 40px;
+}
+.fm-btn-danger { color: #ff6e6e; }
+.fm-btn-danger:hover {
+  background: rgba(255, 85, 85, 0.2) !important;
+  color: #ff5555 !important;
+}

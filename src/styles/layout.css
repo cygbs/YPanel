@@ -1,0 +1,13 @@
+/* YPanel 全局样式 — 布局 */
+
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+.content-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
