@@ -175,6 +175,7 @@ notification:
 # ── 文件管理器 ──
 fm:
   name: 名称
+  actions: 操作
   size: 大小
   modified: 修改时间
   go_up: 上级目录

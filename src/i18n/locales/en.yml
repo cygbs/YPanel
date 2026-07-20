@@ -175,6 +175,7 @@ notification:
 # ── File Manager ──
 fm:
   name: Name
+  actions: Actions
   size: Size
   modified: Modified
   go_up: Parent Directory

@@ -175,6 +175,7 @@ notification:
 # ── 文檔管理 ──
 fm:
   name: 名
+  actions: 操作
   size: 大小
   modified: 修時
   go_up: 上級目錄

@@ -41,9 +41,18 @@
         <thead>
           <tr>
             <th class="fm-col-name">{{ $t('fm.name') }}</th>
-            <th class="fm-col-size">{{ $t('fm.size') }}</th>
-            <th class="fm-col-modified">{{ $t('fm.modified') }}</th>
-            <th class="fm-col-act"></th>
+            <th class="fm-col-size" :style="{ width: colWidths.size + 'px' }">
+              {{ $t('fm.size') }}
+              <span class="fm-resize-handle" @mousedown.prevent="startResize($event, 'size')"></span>
+            </th>
+            <th class="fm-col-modified" :style="{ width: colWidths.modified + 'px' }">
+              {{ $t('fm.modified') }}
+              <span class="fm-resize-handle" @mousedown.prevent="startResize($event, 'modified')"></span>
+            </th>
+            <th class="fm-col-act" :style="{ width: colWidths.actions + 'px' }">
+              {{ $t('fm.actions') }}
+              <span class="fm-resize-handle" @mousedown.prevent="startResize($event, 'actions')"></span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -82,7 +91,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, nextTick, inject, type Ref } from 'vue';
+import { defineComponent, ref, watch, nextTick, onUnmounted, inject, type Ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 interface FileEntry {
@@ -128,6 +137,39 @@ export default defineComponent({
 
     const initialLoad = ref(false);
     const nodeIdStr = ref('');
+
+    // 列宽（可拖拽调整）
+    const colWidths = ref<Record<string, number>>({ size: 90, modified: 140, actions: 200 });
+    const resizing = ref<string | null>(null);
+    const resizeStartX = ref(0);
+    const resizeStartWidth = ref(0);
+
+    function startResize(e: MouseEvent, col: string): void {
+      resizing.value = col;
+      resizeStartX.value = e.clientX;
+      resizeStartWidth.value = colWidths.value[col];
+      document.addEventListener('mousemove', onResizeMove);
+      document.addEventListener('mouseup', onResizeEnd);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+    function onResizeMove(e: MouseEvent): void {
+      if (!resizing.value) return;
+      const delta = e.clientX - resizeStartX.value;
+      const col = resizing.value;
+      colWidths.value[col] = Math.max(40, resizeStartWidth.value + delta);
+    }
+    function onResizeEnd(): void {
+      resizing.value = null;
+      document.removeEventListener('mousemove', onResizeMove);
+      document.removeEventListener('mouseup', onResizeEnd);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    onUnmounted(() => {
+      document.removeEventListener('mousemove', onResizeMove);
+      document.removeEventListener('mouseup', onResizeEnd);
+    });
 
     function buildApi(path: string): string {
       const prefix = apiPrefix();
@@ -364,6 +406,7 @@ export default defineComponent({
 
     return {
       currentPath, addrPath, addrInput, files, selectedName, loading,
+      colWidths, startResize,
       mkdirVisible, mkdirName, mkdirInput, doMkdir, showMkdir,
       renameTarget, renameName, renameInput, startRename, doRename,
       fileInput, triggerUpload, onFilePicked,

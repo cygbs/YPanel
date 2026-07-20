@@ -50,6 +50,7 @@
 .fm-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .fm-table thead { position: sticky; top: 0; z-index: 1; }
 .fm-table th {
+  position: relative;
   height: 28px;
   background: #16162e;
   color: #888;
@@ -79,6 +80,7 @@
 .fm-row-up { color: #aaa; cursor: pointer; }
 .fm-row-up:hover { background: #1a1a3a; }
 .fm-col-name { width: auto; }
+/* size/modified/actions 列宽由 Vue 动态控制，以下为默认值 */
 .fm-col-size { width: 90px; }
 .fm-col-modified { width: 140px; }
 .fm-col-act { width: 200px; text-align: right !important; }
@@ -109,4 +111,20 @@
   text-align: center;
   color: #666;
   font-size: 13px;
+}
+
+/* 列拖拽调整 */
+.fm-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 2;
+}
+.fm-resize-handle:hover,
+.fm-resize-handle:active {
+  background: #6272a4;
 }
