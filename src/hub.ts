@@ -855,8 +855,19 @@ function handleEventsConnection(ws: WebSocket, req: http.IncomingMessage): void 
   // 发送完整初始状态
   sendEvent(ws, { type: 'nodes', nodes: readNodes() });
 
-  ws.on('close', () => browserEventClients.delete(ws));
-  ws.on('error', () => browserEventClients.delete(ws));
+  // 心跳：防代理/防火墙空闲断连
+  const ping = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) ws.ping();
+  }, 30000);
+
+  ws.on('close', () => {
+    clearInterval(ping);
+    browserEventClients.delete(ws);
+  });
+  ws.on('error', () => {
+    clearInterval(ping);
+    browserEventClients.delete(ws);
+  });
 }
 
 // ═══════════════════════════════════════════════════
@@ -930,6 +941,11 @@ wss.on('connection', (ws: WebSocket, req) => {
     uploadSessions.set(uploadSessionId, { ws, nodeId });
     console.log(`[tunnel] upload start: session=${uploadSessionId} node=#${nodeId}`);
 
+    // 心跳：防代理/防火墙空闲断连
+    const uploadPing = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.ping();
+    }, 30000);
+
     ws.on('message', (raw) => {
       const text = bufToStr(raw);
       let msg: any;
@@ -938,12 +954,16 @@ wss.on('connection', (ws: WebSocket, req) => {
     });
 
     ws.on('close', () => {
+      clearInterval(uploadPing);
       if (linkWs.readyState === WebSocket.OPEN) {
         linkWs.send(JSON.stringify({ type: 'upload_cancel', uploadSessionId }));
       }
       uploadSessions.delete(uploadSessionId);
     });
-    ws.on('error', () => { uploadSessions.delete(uploadSessionId); });
+    ws.on('error', () => {
+      clearInterval(uploadPing);
+      uploadSessions.delete(uploadSessionId);
+    });
     return;
   }
 
@@ -961,6 +981,11 @@ wss.on('connection', (ws: WebSocket, req) => {
     instanceId: (instanceId !== null && !isNaN(instanceId)) ? instanceId : null,
   }));
 
+  // 心跳：防代理/防火墙空闲断连
+  const termPing = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) ws.ping();
+  }, 30000);
+
   ws.on('message', (raw) => {
     const text = bufToStr(raw);
     try {
@@ -974,12 +999,14 @@ wss.on('connection', (ws: WebSocket, req) => {
   });
 
   ws.on('close', () => {
+    clearInterval(termPing);
     if (linkWs.readyState === WebSocket.OPEN) {
       linkWs.send(JSON.stringify({ type: 'terminal_close', termId }));
     }
     terminalSessions.delete(termId);
   });
   ws.on('error', () => {
+    clearInterval(termPing);
     if (linkWs.readyState === WebSocket.OPEN) {
       linkWs.send(JSON.stringify({ type: 'terminal_close', termId }));
     }

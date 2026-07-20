@@ -24,6 +24,11 @@ export default defineComponent({
     let terminal: Terminal | null = null;
     let fitAddon: FitAddon | null = null;
     let ws: WebSocket | null = null;
+    let intentionalClose = false;
+    let reconnectAttempts = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let isComposing = false;
+    const MAX_RECONNECT = 10;
 
     // 写队列（回调式流控）
     let writeQueue = '';
@@ -43,6 +48,72 @@ export default defineComponent({
     function enqueueWrite(data: string): void {
       writeQueue += data;
       if (!writeBusy) flushWrite();
+    }
+
+    // ── WebSocket 连接（含自动重连） ──
+    function connectWs(): void {
+      if (!terminal) return;
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const params = new URLSearchParams();
+      if (props.instanceId !== null && props.instanceId !== undefined) {
+        params.set('instanceId', String(props.instanceId));
+      }
+      if (props.nodeId !== null && props.nodeId !== undefined) {
+        params.set('nodeId', String(props.nodeId));
+      }
+      const wsPath = params.toString() ? `/ws?${params.toString()}` : '';
+      const wsUrl = wsPath ? `${protocol}//${location.host}${wsPath}` : null;
+      if (!wsUrl) {
+        terminal.write(t('terminal.unavailable') + '\r\n');
+        return;
+      }
+      ws = new WebSocket(wsUrl);
+
+      ws.addEventListener('open', () => {
+        reconnectAttempts = 0;
+        terminal?.focus();
+        fitAddon?.fit();
+        ws?.send(JSON.stringify({ type: 'resize', cols: terminal?.cols, rows: terminal?.rows }));
+        if (props.instanceId === null) {
+          const cmds = props.initCommands;
+          if (cmds && cmds.length > 0) {
+            setTimeout(() => {
+              for (const cmd of cmds) {
+                if (ws?.readyState === WebSocket.OPEN) ws.send(cmd + '\n');
+              }
+            }, 200);
+          }
+        }
+      });
+
+      ws.addEventListener('message', (event: MessageEvent<string>) => {
+        try {
+          const json = JSON.parse(event.data);
+          if (json.type === 'instance_stopped') {
+            terminal?.write('\r\n\x1b[31m' + t('terminal.instance_stopped') + '\x1b[0m\r\n');
+            intentionalClose = true;
+            setTimeout(() => ws?.close(), 3000);
+            return;
+          }
+        } catch { /* 不是 JSON，当作普通终端输出 */ }
+        enqueueWrite(event.data);
+      });
+
+      ws.addEventListener('close', () => {
+        if (intentionalClose) return;
+        if (reconnectAttempts < MAX_RECONNECT) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+          terminal?.write('\r\n\x1b[33mReconnecting in ' + Math.round(delay / 1000) + 's...\x1b[0m\r\n');
+          reconnectAttempts++;
+          reconnectTimer = setTimeout(connectWs, delay);
+        } else {
+          terminal?.write('\r\n\x1b[31m' + t('terminal.connection_closed') + '\x1b[0m\r\n');
+        }
+      });
+
+      ws.addEventListener('error', () => {
+        // error 后必跟 close，重连逻辑在 close 中处理
+      });
     }
 
     onMounted(() => {
@@ -87,77 +158,13 @@ export default defineComponent({
         fitAddon?.fit();
       });
 
-      // ── WebSocket ──
-      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-
-      // 构建 WS URL：通过 Hub 代理到节点的终端
-      const params = new URLSearchParams();
-      if (props.instanceId !== null && props.instanceId !== undefined) {
-        params.set('instanceId', String(props.instanceId));
-      }
-      if (props.nodeId !== null && props.nodeId !== undefined) {
-        params.set('nodeId', String(props.nodeId));
-      }
-
-      const wsPath = params.toString() ? `/ws?${params.toString()}` : '';
-      const wsUrl = wsPath ? `${protocol}//${location.host}${wsPath}` : null;
-
-      if (!wsUrl) {
-        terminal.write(t('terminal.unavailable') + '\r\n');
-        return;
-      }
-
-      // 认证：HttpOnly Cookie 由浏览器自动发送
-      ws = new WebSocket(wsUrl);
-
       // IME
-      let isComposing = false;
       const textarea = el.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
       textarea?.addEventListener('compositionstart', () => { isComposing = true; });
       textarea?.addEventListener('compositionend', () => { isComposing = false; });
 
-      ws.addEventListener('open', () => {
-        terminal?.focus();
-        fitAddon?.fit();
-        // 同步真实终端尺寸到服务端
-        ws?.send(JSON.stringify({
-          type: 'resize',
-          cols: terminal?.cols,
-          rows: terminal?.rows,
-        }));
-        // 执行初始化命令（仅普通终端）
-        if (props.instanceId === null) {
-          const cmds = props.initCommands;
-          if (cmds && cmds.length > 0) {
-            setTimeout(() => {
-              for (const cmd of cmds) {
-                ws?.send(cmd + '\n');
-              }
-            }, 200);
-          }
-        }
-      });
-
-      ws.addEventListener('message', (event: MessageEvent<string>) => {
-        // 检查结构化 JSON 控制消息（如实例停止通知）
-        try {
-          const json = JSON.parse(event.data);
-          if (json.type === 'instance_stopped') {
-            terminal?.write('\r\n\x1b[31m' + t('terminal.instance_stopped') + '\x1b[0m\r\n');
-            setTimeout(() => ws?.close(), 3000);
-            return;
-          }
-        } catch { /* 不是 JSON，当作普通终端输出 */ }
-        enqueueWrite(event.data);
-      });
-
-      ws.addEventListener('close', () => {
-        terminal?.write('\r\n\x1b[31m' + t('terminal.connection_closed') + '\x1b[0m\r\n');
-      });
-
-      ws.addEventListener('error', () => {
-        terminal?.write('\r\n\x1b[31m' + t('terminal.connection_error') + '\x1b[0m\r\n');
-      });
+      // WebSocket 连接（含自动重连）
+      connectWs();
 
       terminal.onData((data: string) => {
         if (ws?.readyState === WebSocket.OPEN && !isComposing) {
@@ -197,6 +204,8 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
+      intentionalClose = true;
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
       window.removeEventListener('resize', onResize);
       ws?.close();
       ws = null;
