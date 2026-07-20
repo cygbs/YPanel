@@ -198,7 +198,7 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
         const { name, uuid, icon, command, folder, stopCommand, autoStart } = req.body || {};
         if (!name || !uuid) { respondError(400, 'name and uuid are required'); return; }
         const data = readInstances();
-        const nextId = data.instances.length;
+        const nextId = data.instances.length > 0 ? Math.max(...data.instances.map((i: any) => i.id)) + 1 : 0;
         const instance = {
           id: nextId, name, uuid,
           icon: icon || 'grass.svg', command: command || '',
@@ -314,6 +314,7 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
       }
       // ^C 仅杀死 shell 的前台进程，shell 本身仍存活，onExit 不会触发
       // 通过 stats() 检测前台进程是否已退出（只剩 shell），退出则清理
+      // 注：此轮询不限时，因为部分服务器进程需要较长时间保存数据
       const stopPoll = setInterval(() => {
         const proc = managedProcesses.get(id);
         if (!proc) { clearInterval(stopPoll); return; }

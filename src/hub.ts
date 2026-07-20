@@ -564,7 +564,7 @@ app.post('/api/nodes', mutationLimiter, (req, res) => {
   const nodeName = name || (lang === 'zh-CN' ? `节点 ${data.nodes.length + 1}` : `Node ${data.nodes.length + 1}`);
   const now = new Date().toISOString();
   data.nodes.push({
-    id: data.nodes.length,
+    id: data.nodes.length > 0 ? Math.max(...data.nodes.map((n: any) => n.id)) + 1 : 0,
     name: nodeName,
     token,
     connected: false,
