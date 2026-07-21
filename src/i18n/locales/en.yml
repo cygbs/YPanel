@@ -194,6 +194,8 @@ fm:
   edit: Edit
   edit_title: 'Edit {name}'
   delete: Delete
+  delete_title: Confirm Delete
+  delete_confirm_btn: Delete
   delete_file_confirm: 'Delete file "{name}"?'
   delete_dir_confirm: 'Delete folder "{name}"? All contents will be removed.'
   delete_failed: Delete failed

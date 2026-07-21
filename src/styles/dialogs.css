@@ -147,7 +147,7 @@
 .icon-option.selected { background: var(--el-color-primary-light-9); }
 .icon-option img { width: 24px; height: 24px; }
 
-/* 按钮 */
+/* 按钮（FileManagerTab mkdir/rename 仍用，其余已迁移到 el-button） */
 .btn {
   height: 34px;
   padding: 0 20px;
@@ -158,11 +158,11 @@
   transition: background 0.15s;
 }
 .btn-sm { height: 28px !important; padding: 0 12px !important; font-size: 12px !important; }
-.btn-secondary { background: #2a2a4a; color: #ccc; }
-.btn-secondary:hover { background: #3a3a5a; }
-.btn-primary { background: #50fa7b; color: #111; font-weight: 600; }
-.btn-primary:hover { background: #69ff94; }
-.btn-danger { background: #ff5555; color: #fff; font-weight: 600; }
-.btn-danger:hover { background: #ff6e6e; }
-.btn-warning { background: #ff8c00 !important; color: #fff !important; font-weight: 700; }
-.btn-warning:hover { background: #ff6a00 !important; }
+.btn-secondary { background: var(--el-button-bg-color); color: var(--el-button-text-color); }
+.btn-secondary:hover { background: var(--el-fill-color-light); }
+.btn-primary { background: var(--el-color-primary); color: #fff; font-weight: 600; }
+.btn-primary:hover { background: var(--el-color-primary-light-3); }
+.btn-danger { background: var(--el-color-danger); color: #fff; font-weight: 600; }
+.btn-danger:hover { background: var(--el-color-danger-light-3); }
+.btn-warning { background: var(--el-color-warning) !important; color: #fff !important; font-weight: 700; }
+.btn-warning:hover { background: var(--el-color-warning-light-3) !important; }

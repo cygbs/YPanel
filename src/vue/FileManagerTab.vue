@@ -291,11 +291,17 @@ export default defineComponent({
     }
 
     // ── 删除 ──
-    function confirmDelete(f: FileEntry): void {
+    async function confirmDelete(f: FileEntry): Promise<void> {
       const fullPath = currentPath.value.replace(/\/$/, '') + '/' + f.name;
       const label = f.type === 'dir' ? t('fm.delete_dir_confirm', { name: f.name }) : t('fm.delete_file_confirm', { name: f.name });
-      if (!confirm(label)) return;
-      doDelete(fullPath);
+      try {
+        await ElMessageBox.confirm(label, t('fm.delete_title'), {
+          confirmButtonText: t('fm.delete_confirm_btn'),
+          cancelButtonText: t('cancel'),
+          type: 'warning',
+        });
+        doDelete(fullPath);
+      } catch { /* cancelled */ }
     }
     async function doDelete(fullPath: string): Promise<void> {
       try {

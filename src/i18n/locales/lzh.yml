@@ -194,6 +194,8 @@ fm:
   edit: 編
   edit_title: 編 {name}
   delete: 刪
+  delete_title: 確刪
+  delete_confirm_btn: 刪
   delete_file_confirm: 確刪文檔「{name}」乎？
   delete_dir_confirm: 確刪夾「{name}」乎？內文皆去
   delete_failed: 刪敗
