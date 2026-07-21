@@ -5,7 +5,7 @@ A web panel for Minecraft server.
 
 [English README](https://github.com/cygbs/YPanel/blob/main/README_EN.md)
 
-这是一个简单的网页面板，适用于Minecraft服务器，或者是别的什么程序。它使用TypeScript、Vue.js等编写。实例图标来自[Prism Launcher](https://prismlauncher.org)，整体上也参考了它的设计。项目使用`deepseek-v4-flash`模型辅助创作。
+这是一个简单的网页面板，适用于Minecraft服务器，或者是别的什么程序。它使用TypeScript、Vue.js等编写。实例图标来自[Prism Launcher](https://prismlauncher.org)，整体上也参考了它的设计。项目使用`deepseek-v4-flash`和`deepseek-v4-pro`模型辅助创作。
 
 ## 特点
 
@@ -61,7 +61,7 @@ curl -fsSL https://raw.githubusercontent.com/cygbs/YPanel/refs/heads/main/script
 
 启动方法是，先进入`dist`目录执行`node index.js`启动Hub，然后在Hub中添加并获取Node端的启动命令，接着在`dist-node`文件夹中运行Node端启动命令，很快节点就能够连接上。
 
-你需要一个Hub和一个及以上的Node端来使用这个面板。**绝对不要使用root或者Administrator、SYSTEM这样的账户来运行面板和实例！这会将你置于危险之中。**
+你需要一个Hub和一个及以上的Node端来使用这个面板。**绝对不要使用root或者Administrator、SYSTEM这样的账户来运行面板和实例！这会将你置于危险之中。如果你使用一键脚本安装，脚本默认会创建并使用的是一个低权限用户。也请一定记得给面板套HTTPS（通过nginx等HTTP服务器软件），即使是自签名证书也会比HTTP直接暴露在公网好很多，最好配置一份来自Let's Encrypt的证书（可以使用acme.sh这样的自动续期程序）。**
 
 ## 编译
 

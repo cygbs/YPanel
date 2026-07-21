@@ -16,14 +16,14 @@
   padding: 0 10px;
   gap: 8px;
 }
-.fm-breadcrumb { flex: 9; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.fm-breadcrumb { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .fm-addr-input {
   flex: 1;
   height: 28px !important;
   font-family: Menlo, Monaco, 'Courier New', monospace !important;
   font-size: 12px !important;
 }
-.fm-toolbar .fm-actions { flex: 1; display: flex; gap: 4px; justify-content: flex-end; }
+.fm-toolbar .fm-actions { flex-shrink: 0; display: flex; gap: 4px; justify-content: flex-end; }
 .fm-btn-sm {
   height: 28px;
   padding: 0 10px;
