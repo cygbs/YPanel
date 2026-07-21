@@ -17,7 +17,7 @@ import { spawn, type IPty } from 'zigpty';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { readJSON, writeJSON, type Instance, type InstanceData, type NodeSettings } from './shared.js';
+import { readJSON, writeJSON, type Instance, type InstanceData, type NodeSettings, type NodeData } from './shared.js';
 
 // ── CLI 参数 ──
 const args: Record<string, string> = {};
@@ -64,6 +64,7 @@ const ROOT_DIR = process.argv[1]?.endsWith('.ts')
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const INSTANCES_FILE = path.join(DATA_DIR, 'instances.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+const DATA_FILE = path.join(DATA_DIR, 'data.json');
 
 function ensureDataDir(): void {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -87,6 +88,16 @@ function readSettings(): NodeSettings {
 function writeSettings(s: NodeSettings): void {
   ensureDataDir();
   writeJSON(SETTINGS_FILE, s);
+}
+
+function readNodeData(): NodeData {
+  ensureDataDir();
+  return readJSON(DATA_FILE, { totalRuntime: 0, startTime: null });
+}
+
+function writeNodeData(d: NodeData): void {
+  ensureDataDir();
+  writeJSON(DATA_FILE, d);
 }
 
 function getDefaultShell(): string | undefined {
@@ -122,6 +133,8 @@ function registerProcess(
   });
   pty.onExit(() => {
     managedProcesses.delete(instanceId);
+    // 记录实例运行时长（仅真实实例，非托管终端 ID 为负）
+    if (instanceId >= 0) recordInstanceStop(instanceId);
     sendToHub({ type: 'process_exited', instanceId });
     // 非托管终端（负 ID）退出时通知 Hub 关闭所有连接的浏览器 WS
     if (instanceId < 0) {
@@ -147,6 +160,25 @@ const managedProcesses = new Map<number, ManagedProcess>();
 
 function getInstanceById(id: number): Instance | null {
   return readInstances().instances.find(i => i.id === id) || null;
+}
+
+/** 记录实例停止时间，将本次运行时长累加到 totalRuntime */
+function recordInstanceStop(instanceId: number): void {
+  const data = readInstances();
+  const inst = data.instances.find(i => i.id === instanceId);
+  if (!inst || inst.lastStartTime === null) return;
+  const elapsed = Date.now() - inst.lastStartTime;
+  inst.totalRuntime = (inst.totalRuntime || 0) + elapsed;
+  writeInstances(data);
+}
+
+/** 记录实例启动，设置 lastStartTime */
+function recordInstanceStart(instanceId: number): void {
+  const data = readInstances();
+  const inst = data.instances.find(i => i.id === instanceId);
+  if (!inst) return;
+  inst.lastStartTime = Date.now();
+  writeInstances(data);
 }
 
 /** 将 PTY 输出的 data 转为字符串 */
@@ -230,6 +262,7 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
           icon: icon || 'grass.svg', command: command || '',
           folder: folder || '', stopCommand: stopCommand || '^C',
           autoStart: !!autoStart, createdAt: new Date().toISOString(),
+          totalRuntime: 0, lastStartTime: null,
         };
         data.instances.push(instance);
         writeInstances(data);
@@ -295,6 +328,7 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
         return;
       }
       registerProcess(pty, id);
+      recordInstanceStart(id);
       pty.write(`cd "${inst.folder}"\r`);
       pty.write(`${inst.command}\r`);
       respond(200, { status: 'started', instanceId: id });
@@ -337,6 +371,7 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
       if (isNaN(id)) { respondError(400, 'invalid id'); return; }
       const mp = managedProcesses.get(id);
       if (!mp) { respond(200, { status: 'not_running' }); return; }
+      recordInstanceStop(id);
       mp.pty.kill();
       managedProcesses.delete(id);
       respond(200, { status: 'force_stopped' });
@@ -485,6 +520,16 @@ function handleApiRequest(ws: WebSocket, req: ApiRequest): void {
       }
 
       respondError(405, 'Method not allowed');
+      return;
+    }
+
+    // ── /api/runtime ── 节点端运行时长
+    if (parts.length === 2 && parts[0] === 'api' && parts[1] === 'runtime') {
+      if (req.method === 'GET') {
+        respond(200, readNodeData());
+      } else {
+        respondError(405, 'Method not allowed');
+      }
       return;
     }
 
@@ -705,6 +750,7 @@ function autoStartInstances(): void {
       try {
         const pty = spawnShell(inst.folder || os.homedir());
         registerProcess(pty, inst.id);
+        recordInstanceStart(inst.id);
         pty.write(`cd "${inst.folder}"\r`);
         pty.write(`${inst.command}\r`);
         console.log(`  auto-start: #${inst.id} ${inst.name}`);
@@ -727,9 +773,12 @@ function connectToHub(): void {
   const ws = new WebSocket(HUB_URL, INSECURE ? { rejectUnauthorized: false } : undefined);
 
   ws.on('open', () => {
+    const nd = readNodeData();
     ws.send(JSON.stringify({
       type: 'register',
       token: TOKEN,
+      totalRuntime: nd.totalRuntime || 0,
+      startTime: nd.startTime,
     }));
   });
 
@@ -804,5 +853,39 @@ function connectToHub(): void {
 // ═══════════════════════════════════════════════════
 
 console.log('YPanel Node starting (tunnel mode, no HTTP port)');
+
+// ── 清理残留：之前非正常退出时未清除的 lastStartTime ──
+{
+  const data = readInstances();
+  let dirty = false;
+  for (const inst of data.instances) {
+    if (inst.lastStartTime !== null) {
+      const elapsed = Date.now() - inst.lastStartTime;
+      inst.totalRuntime = (inst.totalRuntime || 0) + elapsed;
+      dirty = true;
+    }
+  }
+  if (dirty) writeInstances(data);
+}
+
+// ── 初始化节点端 data.json ──
+{
+  const nd = readNodeData();
+  nd.startTime = Date.now();
+  writeNodeData(nd);
+}
+
+// ── 退出时保存节点运行时长 ──
+function saveNodeRuntime(): void {
+  const nd = readNodeData();
+  if (nd.startTime !== null) {
+    const elapsed = Date.now() - nd.startTime;
+    nd.totalRuntime = (nd.totalRuntime || 0) + elapsed;
+    writeNodeData(nd);
+  }
+}
+process.on('SIGINT', () => { saveNodeRuntime(); process.exit(0); });
+process.on('SIGTERM', () => { saveNodeRuntime(); process.exit(0); });
+
 autoStartInstances();
 connectToHub();

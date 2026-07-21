@@ -202,3 +202,16 @@ fm:
   empty: This folder is empty
   access_denied: Permission denied
   list_failed: 'Failed to list directory: {error}'
+
+# ── Footer ──
+footer:
+  default_slogan: YPanel — Simple, Fast, Friendly.
+  instance_running: "{name}, running, started at {startTime}, total runtime {runtime}."
+  instance_stopped: "{name}, stopped, last started at {lastStart}, total runtime {runtime}."
+  node_online: "{name}, online, started at {startTime}, total runtime {runtime}."
+  node_offline: "{name}, offline, last started at {lastStart}, total runtime {runtime}."
+  time_format: "{month}/{day}/{year} {hour}:{minute}"
+  duration_d: "{n}d "
+  duration_h: "{n}h "
+  duration_m: "{n}m"
+  duration_zero: "0m"

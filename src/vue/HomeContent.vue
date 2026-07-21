@@ -155,11 +155,15 @@
         </el-card>
       </template>
     </div>
+
+    <!-- ═══════════════ 底部信息条 ═══════════════ -->
+    <div class="home-footer">{{ footerText }}</div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, inject, type Ref, type ComputedRef } from 'vue';
+import { defineComponent, ref, computed, inject, type Ref, type ComputedRef } from 'vue';
+import { useI18n } from 'vue-i18n';
 import {
   Plus, FolderOpened, Setting, ArrowLeft,
   QuestionFilled, ChatDotRound, Sunny, Moon, SwitchButton,
@@ -199,11 +203,91 @@ export default defineComponent({
       if (inst?.folder) openFileManager(inst.folder);
     }
 
+    // ── 底部信息条 ──
+    const { t } = useI18n();
+    const activeNode = inject<ComputedRef<any>>('activeNode')!;
+
+    /** 格式化时间戳，使用 i18n time_format 模板 */
+    function formatTime(ts: number): string {
+      const d = new Date(ts);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return t('footer.time_format', {
+        year: String(d.getFullYear()),
+        month: pad(d.getMonth() + 1),
+        day: pad(d.getDate()),
+        hour: pad(d.getHours()),
+        minute: pad(d.getMinutes()),
+      });
+    }
+
+    /** 格式化毫秒时长，使用 i18n 单位 */
+    function formatDuration(ms: number): string {
+      if (ms <= 0) return t('footer.duration_zero');
+      const totalMin = Math.floor(ms / 60000);
+      const days = Math.floor(totalMin / 1440);
+      const hours = Math.floor((totalMin % 1440) / 60);
+      const minutes = totalMin % 60;
+      const parts: string[] = [];
+      if (days > 0) parts.push(t('footer.duration_d', { n: days }));
+      if (hours > 0) parts.push(t('footer.duration_h', { n: hours }));
+      if (minutes > 0 || parts.length === 0) parts.push(t('footer.duration_m', { n: minutes }));
+      return parts.join('');
+    }
+
+    const footerText = computed(() => {
+      const inst = selectedInstance.value;
+      // 选中了实例
+      if (inst) {
+        const running = runningStates[inst.id];
+        const lastStart = inst.lastStartTime;
+        const totalRuntime = inst.totalRuntime || 0;
+        const name = inst.name;
+        if (running) {
+          return t('footer.instance_running', {
+            name,
+            startTime: lastStart ? formatTime(lastStart) : '?',
+            runtime: formatDuration(totalRuntime + (lastStart ? Date.now() - lastStart : 0)),
+          });
+        } else {
+          return t('footer.instance_stopped', {
+            name,
+            lastStart: lastStart ? formatTime(lastStart) : t('loading'),
+            runtime: formatDuration(totalRuntime),
+          });
+        }
+      }
+
+      // 选中了节点（节点列表层单击，或进入节点后未选实例）
+      const node = activeNodeId.value !== null ? activeNode.value : selectedNodeForMenu.value;
+      if (node) {
+        const name = node.name;
+        const connected = node.connected;
+        const startTime = node.startTime;
+        const totalRuntime = node.totalRuntime || 0;
+        if (connected) {
+          return t('footer.node_online', {
+            name,
+            startTime: startTime ? formatTime(startTime) : '?',
+            runtime: formatDuration(totalRuntime + (startTime ? Date.now() - startTime : 0)),
+          });
+        } else {
+          return t('footer.node_offline', {
+            name,
+            lastStart: startTime ? formatTime(startTime) : t('loading'),
+            runtime: formatDuration(totalRuntime),
+          });
+        }
+      }
+
+      return t('footer.default_slogan');
+    });
+
     return {
       isDark, toggleTheme,
       nodes, activeNodeId, activeId, instances,
       selectedNodeId, selectedNodeForMenu, selectedInstance,
       runningStates, stopRequested,
+      footerText,
       selectNode: inject('selectNode')!,
       selectInstance: inject('selectInstance')!,
       openNewInstance: inject('openNewInstance')!,

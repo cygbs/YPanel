@@ -202,3 +202,16 @@ fm:
   empty: 此目录为空
   access_denied: 无权访问该目录
   list_failed: '加载目录失败：{error}'
+
+# ── 底部状态栏 ──
+footer:
+  default_slogan: YPanel——极简、快速、好用。
+  instance_running: "{name}，正在运行，启动时间为{startTime}，总运行时长{runtime}。"
+  instance_stopped: "{name}，已停止，上一次启动时间为{lastStart}，总运行时长{runtime}。"
+  node_online: "{name}，在线，启动时间为{startTime}，总运行时长{runtime}。"
+  node_offline: "{name}，离线，上一次启动时间为{lastStart}，总运行时长{runtime}。"
+  time_format: "{year}年{month}月{day}日{hour}时{minute}分"
+  duration_d: "{n}天"
+  duration_h: "{n}时"
+  duration_m: "{n}分"
+  duration_zero: "0分"

@@ -544,6 +544,10 @@ interface NodeEntry {
   connected: boolean;
   lastSeen: string;
   icon?: string;
+  /** 节点累计运行时长（毫秒，由节点上报） */
+  totalRuntime?: number;
+  /** 节点本次启动时间戳（毫秒，由节点上报） */
+  startTime?: number | null;
 }
 
 interface NodesData {
@@ -774,6 +778,9 @@ function handleLinkConnection(ws: WebSocket): void {
           const nodeId = existing.id;
           existing.connected = true;
           existing.lastSeen = now;
+          // 记录节点上报的运行时数据
+          if (typeof msg.totalRuntime === 'number') existing.totalRuntime = msg.totalRuntime;
+          if (msg.startTime !== undefined) existing.startTime = msg.startTime;
           const oldWs = nodeConnections.get(nodeId);
           if (oldWs && oldWs !== ws) { try { oldWs.close(); } catch { /* ignore */ } }
           writeNodes(data);

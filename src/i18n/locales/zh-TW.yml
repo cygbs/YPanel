@@ -202,3 +202,16 @@ fm:
   empty: 此目錄為空
   access_denied: 無權存取此目錄
   list_failed: '載入目錄失敗：{error}'
+
+# ── 底部狀態欄 ──
+footer:
+  default_slogan: YPanel——極簡、快速、好用。
+  instance_running: "{name}，正在執行，啟動時間為{startTime}，總執行時長{runtime}。"
+  instance_stopped: "{name}，已停止，上一次啟動時間為{lastStart}，總執行時長{runtime}。"
+  node_online: "{name}，線上，啟動時間為{startTime}，總執行時長{runtime}。"
+  node_offline: "{name}，離線，上一次啟動時間為{lastStart}，總執行時長{runtime}。"
+  time_format: "{year}年{month}月{day}日{hour}時{minute}分"
+  duration_d: "{n}天"
+  duration_h: "{n}時"
+  duration_m: "{n}分"
+  duration_zero: "0分"

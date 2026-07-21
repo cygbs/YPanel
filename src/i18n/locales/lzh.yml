@@ -202,3 +202,16 @@ fm:
   empty: 此錄空
   access_denied: 無權入此錄
   list_failed: '載錄敗：{error}'
+
+# ── 底部狀態欄 ──
+footer:
+  default_slogan: YPanel——至簡、至速、至善。
+  instance_running: "{name}，行中，啟時為{startTime}，總行時{runtime}。"
+  instance_stopped: "{name}，已止，前啟時為{lastStart}，總行時{runtime}。"
+  node_online: "{name}，在線，啟時為{startTime}，總行時{runtime}。"
+  node_offline: "{name}，離線，前啟時為{lastStart}，總行時{runtime}。"
+  time_format: "{year}年{month}月{day}日{hour}時{minute}分"
+  duration_d: "{n}日"
+  duration_h: "{n}時"
+  duration_m: "{n}分"
+  duration_zero: "0分"

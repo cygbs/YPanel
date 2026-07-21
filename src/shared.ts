@@ -14,6 +14,10 @@ export interface Instance {
   stopCommand: string;
   autoStart: boolean;
   createdAt: string;
+  /** 累计运行时长（毫秒） */
+  totalRuntime: number;
+  /** 最近一次启动时间戳（毫秒），运行中非 null，已停止为 null */
+  lastStartTime: number | null;
 }
 
 export interface InstanceData {
@@ -23,6 +27,14 @@ export interface InstanceData {
 export interface NodeSettings {
   defaultShell: string;
   textEditor: string;
+}
+
+/** 节点端全局数据 */
+export interface NodeData {
+  /** 节点累计运行时长（毫秒） */
+  totalRuntime: number;
+  /** 当前进程启动时间戳（毫秒），null 表示未在运行 */
+  startTime: number | null;
 }
 
 // ── IO 工具 ──
