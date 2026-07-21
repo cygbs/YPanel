@@ -25,12 +25,13 @@
   background: var(--el-color-primary);
 }
 
-/* 新建标签页按钮 — 填满剩余区域 */
+/* 新建标签页按钮 — 固定尺寸 */
 .tab-bar-el .el-tabs__new-tab {
-  flex: 1;
+  flex: 0 0 37px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 37px;
   height: 37px;
   margin: 0;
   border: none;
