@@ -138,8 +138,31 @@ export default defineComponent({
     const initialLoad = ref(false);
     const nodeIdStr = ref('');
 
-    // 列宽（可拖拽调整）
-    const colWidths = ref<Record<string, number>>({ size: 90, modified: 140, actions: 200 });
+    // 列宽（可拖拽调整，存储于 Cookie 中持久化）
+    const FM_COLS_COOKIE = 'YP_FM_COLS';
+    const DEFAULT_COL_WIDTHS: Record<string, number> = { size: 90, modified: 140, actions: 200 };
+
+    function loadColWidths(): Record<string, number> {
+      try {
+        const m = document.cookie.match(new RegExp(`\\b${FM_COLS_COOKIE}=([^;]+)`));
+        if (m) {
+          const parsed = JSON.parse(decodeURIComponent(m[1]));
+          // 只合并已知 key，忽略未知 key，过滤无效值
+          const result = { ...DEFAULT_COL_WIDTHS };
+          for (const k of Object.keys(DEFAULT_COL_WIDTHS)) {
+            if (typeof parsed[k] === 'number' && parsed[k] >= 40) result[k] = parsed[k];
+          }
+          return result;
+        }
+      } catch { /* parse error, fall through */ }
+      return { ...DEFAULT_COL_WIDTHS };
+    }
+
+    function saveColWidths(w: Record<string, number>): void {
+      document.cookie = `${FM_COLS_COOKIE}=${encodeURIComponent(JSON.stringify(w))}; path=/; max-age=${365 * 24 * 60 * 60}; SameSite=Lax`;
+    }
+
+    const colWidths = ref<Record<string, number>>(loadColWidths());
     const resizing = ref<string | null>(null);
     const resizeStartX = ref(0);
     const resizeStartWidth = ref(0);
@@ -165,6 +188,7 @@ export default defineComponent({
       document.removeEventListener('mouseup', onResizeEnd);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      saveColWidths(colWidths.value);
     }
     onUnmounted(() => {
       document.removeEventListener('mousemove', onResizeMove);

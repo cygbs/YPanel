@@ -852,7 +852,7 @@ function connectToHub(): void {
 // 启动
 // ═══════════════════════════════════════════════════
 
-console.log('YPanel Node starting (tunnel mode, no HTTP port)');
+console.log('YPanel Node starting');
 
 // ── 清理残留：之前非正常退出时未清除的 lastStartTime ──
 {
