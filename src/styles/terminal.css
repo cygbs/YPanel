@@ -4,4 +4,24 @@
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
 }
-.terminal-view { width: 100%; height: 100%; }
+.terminal-view {
+  width: 100%;
+  height: 100%;
+  /* 与 home-grid 同背景色，消除字符格对齐产生的右侧/底部空隙 */
+  background: var(--el-bg-color-page);
+}
+/* xterm 各层背景统一，消除层间缝隙 */
+.terminal-view .xterm {
+  width: 100%;
+  height: 100%;
+  background: var(--el-bg-color-page);
+}
+.terminal-view .xterm-screen {
+  width: 100% !important;
+  height: 100% !important;
+  background: var(--el-bg-color-page);
+}
+.terminal-view .xterm-viewport {
+  width: 100% !important;
+  background: var(--el-bg-color-page) !important;
+}
