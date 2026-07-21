@@ -21,13 +21,27 @@ import { readJSON, writeJSON, type Instance, type InstanceData, type NodeSetting
 
 // ── CLI 参数 ──
 const args: Record<string, string> = {};
-for (let i = 2; i < process.argv.length; i += 2) {
-  if (process.argv[i].startsWith('-')) {
-    args[process.argv[i].slice(1)] = process.argv[i + 1];
+for (let i = 2; i < process.argv.length; i++) {
+  const arg = process.argv[i];
+  if (arg.startsWith('--')) {
+    const key = arg.slice(2);
+    if (i + 1 >= process.argv.length || process.argv[i + 1].startsWith('-')) {
+      args[key] = '1';
+    } else {
+      args[key] = process.argv[++i];
+    }
+  } else if (arg.length === 2 && arg.startsWith('-')) {
+    // 短标志：-k → boolean，-s xxx → 有值
+    if (i + 1 >= process.argv.length || process.argv[i + 1].startsWith('-')) {
+      args[arg[1]] = '1';
+    } else {
+      args[arg[1]] = process.argv[++i];
+    }
   }
 }
-const HUB_URL = args.s || args.S || '';
-const TOKEN = args.t || args.T || '';
+const HUB_URL = args.s || '';
+const TOKEN = args.t || '';
+const INSECURE = !!args.k;
 
 // ── 常量 ──
 const TERM_COLS = 80;
@@ -35,8 +49,10 @@ const TERM_ROWS = 24;
 const MAX_OUTPUT_BUFFER = 2000;
 
 if (!HUB_URL || !TOKEN) {
-  console.error('Usage: node index.js -s <hub-ws-url> -t <token>');
-  console.error('Example: node index.js -s ws://192.168.1.100:6699/link -t <token>');
+  console.error('Usage: node index.js -s <hub-ws-url> -t <token> [-k]');
+  console.error('  -s  Hub WebSocket URL (e.g. wss://1.2.3.4:7000/link)');
+  console.error('  -t  Node auth token');
+  console.error('  -k  Allow self-signed certificates (reduces security)');
   process.exit(1);
 }
 
@@ -708,7 +724,7 @@ function autoStartInstances(): void {
 
 function connectToHub(): void {
   console.log(`Connecting to hub: ${HUB_URL}`);
-  const ws = new WebSocket(HUB_URL);
+  const ws = new WebSocket(HUB_URL, INSECURE ? { rejectUnauthorized: false } : undefined);
 
   ws.on('open', () => {
     ws.send(JSON.stringify({
@@ -771,6 +787,9 @@ function connectToHub(): void {
 
   ws.on('error', (err) => {
     console.error('Hub connection error:', err.message);
+    if (!INSECURE && /certificate|self.signed|SSL|TLS|DEPTH_ZERO/i.test(err.message)) {
+      console.error('  Hint: add -k to allow self-signed certificates (reduces security)');
+    }
   });
 
   sendToHub = (msg: any) => {
