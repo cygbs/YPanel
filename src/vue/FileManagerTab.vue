@@ -202,18 +202,18 @@ export default defineComponent({
       }
     }
 
-    // 监听 nodeId 变化：加载家目录
+    // 监听 nodeId 变化：加载目录（默认家目录）
     watch(() => props.nodeId, (nid) => {
       if (nid !== null && nid !== undefined) {
         nodeIdStr.value = String(nid);
-        listDir(props.initPath || '/');
+        listDir(props.initPath || '');
       }
     }, { immediate: true });
 
     // 当标签页激活时重新触发
     watch(() => props.isActive, (active) => {
       if (active && props.nodeId !== null && !initialLoad.value) {
-        listDir(props.initPath || '/');
+        listDir(props.initPath || '');
       }
     });
 
@@ -221,6 +221,8 @@ export default defineComponent({
       if (f.type === 'dir') {
         const newPath = currentPath.value.replace(/\/$/, '') + '/' + f.name;
         listDir(newPath);
+      } else {
+        startEdit(f);
       }
     }
 
@@ -240,7 +242,7 @@ export default defineComponent({
       nextTick(() => addrInput.value?.select());
     }
 
-    function refresh(): void { listDir(currentPath.value || '/'); }
+    function refresh(): void { listDir(currentPath.value || ''); }
 
     // ── 新文件夹 ──
     function showMkdir(): void {
