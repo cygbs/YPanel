@@ -1,4 +1,4 @@
-/* YPanel 全局样式 — 通知弹窗 */
+/* YPanel 全局样式 — 通知弹窗（Element Plus 亮/暗主题适配） */
 
 .toast-container {
   position: fixed;
@@ -12,8 +12,8 @@
 }
 .toast {
   pointer-events: auto;
-  background: #1a1a2e;
-  border: 1px solid #2a2a4a;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
   border-radius: 6px;
   overflow: hidden;
   min-width: 240px;
@@ -21,23 +21,23 @@
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 .toast-bar { height: 3px; }
-.toast-success .toast-bar { background: #22c55e; }
-.toast-error .toast-bar { background: #ef4444; }
+.toast-success .toast-bar { background: var(--el-color-success); }
+.toast-error .toast-bar { background: var(--el-color-danger); }
 .toast-close {
   position: absolute;
   top: 8px; right: 10px;
   background: none;
   border: none;
-  color: #888;
+  color: var(--el-text-color-secondary);
   font-size: 18px;
   cursor: pointer;
   padding: 0;
   line-height: 1;
 }
-.toast-close:hover { color: #fff; }
+.toast-close:hover { color: var(--el-text-color-primary); }
 .toast-body {
   padding: 10px 32px 10px 12px;
-  color: #e0e0e0;
+  color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1.5;
 }
