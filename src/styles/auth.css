@@ -1,28 +1,68 @@
-/* YPanel 全局样式 — 登录/修改密码 */
+/* YPanel 认证界面样式（基于 Element Plus 暗色主题） */
 
 .auth-screen {
   width: 100%;
   height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #12122a;
-}
-.auth-box {
-  background: #1e1e3a;
-  border-radius: 10px;
-  padding: 32px;
-  width: 360px;
-  display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 16px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  background: var(--el-bg-color-page, #12122a);
 }
-.auth-title { font-size: 24px; font-weight: 700; color: #50fa7b; }
-.auth-subtitle { font-size: 14px; color: #888; margin-top: -8px; }
-.auth-field { width: 100%; }
-.auth-field .input { width: 100%; }
-.auth-error { font-size: 12px; color: #ff5555; }
-.auth-btn { width: 100%; height: 38px; font-size: 14px; }
-.auth-loading { color: #888; font-size: 14px; }
+
+.auth-card {
+  width: 380px;
+  border: 1px solid var(--el-border-color-darker);
+}
+
+/* 卡片内部间距 */
+.auth-card .el-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 标题区 */
+.auth-header {
+  text-align: center;
+}
+.auth-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--el-color-primary);
+  letter-spacing: 2px;
+}
+.auth-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
+}
+
+/* 登录/修改按钮占满宽度 */
+.auth-btn {
+  width: 100%;
+}
+
+/* 错误提示 */
+.auth-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--el-color-danger);
+  text-align: center;
+}
+
+/* 加载中 */
+.auth-loading-icon {
+  color: var(--el-color-primary);
+  animation: auth-spin 1s linear infinite;
+}
+.auth-loading-text {
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+}
+@keyframes auth-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

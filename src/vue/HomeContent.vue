@@ -1,96 +1,191 @@
 <!-- 本源代码文件是YPanel项目的一部分，版权所有 (C) cygbs 2026。本项目遵循AGPL-3.0-or-later许可证。 -->
 <template>
   <div v-show="activeId === 0" class="page-home">
-    <div class="quick-actions">
-      <template v-if="activeNodeId !== null">
-        <button @click="openNewInstance">{{ $t('quick.new_instance') }}</button>
-        <button @click="openFileManager()">{{ $t('quick.file_manager') }}</button>
-        <button @click="openSettings">{{ $t('quick.settings') }}</button>
-        <button @click="leaveNode" class="qa-back">{{ $t('quick.back_to_nodes') }}</button>
-      </template>
-      <template v-else>
-        <button @click="openNodeDialog">{{ $t('quick.add_node') }}</button>
-        <button @click="openHubSettings">{{ $t('quick.hub_settings') }}</button>
-      </template>
-      <button @click="openHelp">{{ $t('quick.help') }}</button>
-      <button @click="cycleLocale" class="lang-btn">{{ $t('lang.title') }}</button>
-      <button @click="doLogout" class="qa-back" style="margin-left:auto">{{ $t('quick.logout') }}</button>
+
+    <!-- ═══════════════ 工具栏 ═══════════════ -->
+    <div class="home-toolbar">
+      <div class="home-toolbar-left">
+        <!-- 节点模式 -->
+        <template v-if="activeNodeId === null">
+          <el-button size="small" @click="openNodeDialog">
+            <span class="btn-inner"><el-icon><Plus /></el-icon>{{ $t('quick.add_node') }}</span>
+          </el-button>
+          <el-button size="small" @click="openHubSettings">
+            <span class="btn-inner"><el-icon><Setting /></el-icon>{{ $t('quick.hub_settings') }}</span>
+          </el-button>
+        </template>
+        <!-- 实例模式 -->
+        <template v-else>
+          <el-button size="small" type="primary" @click="openNewInstance">
+            <span class="btn-inner"><el-icon><Plus /></el-icon>{{ $t('quick.new_instance') }}</span>
+          </el-button>
+          <el-button size="small" @click="openFileManager()">
+            <span class="btn-inner"><el-icon><FolderOpened /></el-icon>{{ $t('quick.file_manager') }}</span>
+          </el-button>
+          <el-button size="small" @click="openUploadDialog">
+            <span class="btn-inner"><el-icon><Upload /></el-icon>{{ $t('quick.upload_file') }}</span>
+          </el-button>
+          <el-button size="small" @click="openSettings">
+            <span class="btn-inner"><el-icon><Setting /></el-icon>{{ $t('quick.settings') }}</span>
+          </el-button>
+          <el-button size="small" @click="leaveNode">
+            <span class="btn-inner"><el-icon><ArrowLeft /></el-icon>{{ $t('quick.back_to_nodes') }}</span>
+          </el-button>
+        </template>
+      </div>
+      <div class="home-toolbar-right">
+        <el-button size="small" @click="openHelp">
+          <el-icon><QuestionFilled /></el-icon>
+        </el-button>
+        <el-button size="small" @click="cycleLocale">
+          <span class="btn-inner"><el-icon><ChatDotRound /></el-icon>{{ $t('lang.title') }}</span>
+        </el-button>
+        <el-button size="small" @click="toggleTheme">
+          <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
+        </el-button>
+        <el-button size="small" type="danger" plain @click="doLogout">
+          <span class="btn-inner"><el-icon><SwitchButton /></el-icon>{{ $t('quick.logout') }}</span>
+        </el-button>
+      </div>
     </div>
 
+    <!-- ═══════════════ 主体 ═══════════════ -->
     <div class="home-body">
-      <!-- 节点列表模式 -->
+
+      <!-- ══ 节点列表 ══ -->
       <template v-if="activeNodeId === null">
-        <div class="instance-list">
-          <div v-for="node in nodes" :key="node.id" class="instance-card"
-            :class="{ selected: node.id === selectedNodeId }"
-            @click="selectNode(node.id)" @dblclick="dblclickNode(node)">
-            <div class="inst-icon-wrap">
-              <img class="inst-icon" :src="'/assets/instances/' + (node.icon || 'gear.svg')" :alt="node.name" />
-              <span class="status-dot" :class="node.connected ? 'running' : 'offline'"></span>
+        <div class="home-grid">
+          <el-card
+            v-for="node in nodes" :key="node.id"
+            shadow="hover"
+            :class="['home-card', { selected: node.id === selectedNodeId }]"
+            :body-style="{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'8px', padding:'10px' }"
+            @click="selectNode(node.id)"
+            @dblclick="dblclickNode(node)"
+          >
+            <div class="card-icon-wrap">
+              <img class="card-icon" :src="'/assets/instances/' + (node.icon || 'gear.svg')" :alt="node.name" />
+              <span class="card-dot" :class="node.connected ? 'online' : 'offline'" />
             </div>
-            <span class="inst-name">{{ node.name }}</span>
-          </div>
-          <div v-if="nodes.length === 0" class="no-instances-hint">{{ $t('nodes.none') }}</div>
+            <span class="card-name">{{ node.name }}</span>
+          </el-card>
+          <div v-if="nodes.length === 0" class="home-empty">{{ $t('nodes.none') }}</div>
         </div>
-        <div class="function-menu">
+
+        <el-card class="home-sidebar" :body-style="{ display:'flex', flexDirection:'column', alignItems:'center', gap:'8px', padding:'16px 12px' }">
           <template v-if="selectedNodeForMenu">
-            <div class="fm-icon" @click="selectNode(null)">
-              <img :src="'/assets/instances/' + (selectedNodeForMenu.icon || 'gear.svg')" />
+            <div class="sidebar-icon" @click="selectNode(null)">
+              <img :src="'/assets/instances/' + (selectedNodeForMenu.icon || 'gear.svg')" :alt="selectedNodeForMenu.name" />
             </div>
-            <div class="fm-name">{{ selectedNodeForMenu.name }}</div>
-            <div class="fm-actions">
-              <button class="fm-btn" @click="clickSwitchNode(selectedNodeForMenu)">{{ $t('nodes.switch') }}</button>
-              <button class="fm-btn" @click="openEditNode">{{ $t('nodes.edit') }}</button>
-              <button class="fm-btn fm-btn-danger" @click="openNodeDelete(selectedNodeForMenu.id)">{{ $t('nodes.delete') }}</button>
+            <div class="sidebar-name">{{ selectedNodeForMenu.name }}</div>
+            <div class="sidebar-actions">
+              <el-button size="small" type="primary" @click="clickSwitchNode(selectedNodeForMenu)">
+                {{ $t('nodes.switch') }}
+              </el-button>
+              <el-button size="small" plain @click="openEditNode">
+                <span class="btn-inner"><el-icon><Edit /></el-icon>{{ $t('nodes.edit') }}</span>
+              </el-button>
+              <el-button size="small" type="danger" plain @click="openNodeDelete(selectedNodeForMenu.id)">
+                <span class="btn-inner"><el-icon><Delete /></el-icon>{{ $t('nodes.delete') }}</span>
+              </el-button>
             </div>
           </template>
-          <div v-else class="fm-empty">{{ $t('nodes.select_hint') }}</div>
-        </div>
+          <div v-else class="sidebar-empty">{{ $t('nodes.select_hint') }}</div>
+        </el-card>
       </template>
 
-      <!-- 实例模式 -->
+      <!-- ══ 实例列表 ══ -->
       <template v-else>
-        <div class="instance-list">
-          <div v-for="inst in instances" :key="inst.id" class="instance-card"
-            :class="{ selected: inst.id === selectedInstance?.id }"
-            @click="selectInstance(inst.id)" @dblclick="openTerminal()">
-            <div class="inst-icon-wrap">
-              <img class="inst-icon" :src="'/assets/instances/' + (inst.icon || 'grass.svg')" :alt="inst.name" />
-              <span v-if="runningStates[inst.id]" class="status-dot" :class="runningStates[inst.id]"></span>
+        <div class="home-grid">
+          <el-card
+            v-for="inst in instances" :key="inst.id"
+            shadow="hover"
+            :class="['home-card', { selected: inst.id === selectedInstance?.id }]"
+            :body-style="{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'8px', padding:'10px' }"
+            @click="selectInstance(inst.id)"
+            @dblclick="openTerminal()"
+          >
+            <div class="card-icon-wrap">
+              <img class="card-icon" :src="'/assets/instances/' + (inst.icon || 'grass.svg')" :alt="inst.name" />
+              <span
+                v-if="runningStates[inst.id]"
+                class="card-dot"
+                :class="runningStates[inst.id]"
+              />
             </div>
-            <span class="inst-name">{{ inst.name }} #{{ inst.id }}</span>
-          </div>
-          <div v-if="instances.length === 0" class="no-instances-hint">{{ $t('instances.none') }}</div>
+            <span class="card-name">{{ inst.name }} #{{ inst.id }}</span>
+          </el-card>
+          <div v-if="instances.length === 0" class="home-empty">{{ $t('instances.none') }}</div>
         </div>
-        <div class="function-menu">
+
+        <el-card class="home-sidebar" :body-style="{ display:'flex', flexDirection:'column', alignItems:'center', gap:'8px', padding:'16px 12px' }">
           <template v-if="selectedInstance">
-            <div class="fm-icon" @click="selectInstance(null)">
+            <div class="sidebar-icon" @click="selectInstance(null)">
               <img :src="'/assets/instances/' + (selectedInstance.icon || 'grass.svg')" :alt="selectedInstance.name" />
             </div>
-            <div class="fm-name">{{ selectedInstance.name }}</div>
-            <div class="fm-actions">
-              <button class="fm-btn" :disabled="selectedInstance ? !!runningStates[selectedInstance.id] : true" @click="startInstance">{{ $t('instances.start') }}</button>
-              <button class="fm-btn" :class="{ 'btn-warning': selectedInstance && stopRequested[selectedInstance.id] }"
-                :disabled="selectedInstance ? !runningStates[selectedInstance.id] && !stopRequested[selectedInstance.id] : true"
-                @click="stopInstance">{{ selectedInstance && stopRequested[selectedInstance.id] ? $t('instances.force_stop') : $t('instances.stop') }}</button>
-              <button class="fm-btn" @click="openTerminal">{{ $t('instances.open_terminal') }}</button>
-              <button class="fm-btn" @click="openInstanceFolder">{{ $t('instances.open_folder') }}</button>
-              <button class="fm-btn" @click="openEditInstance">{{ $t('instances.edit') }}</button>
-              <button class="fm-btn fm-btn-danger" @click="openDeleteConfirm">{{ $t('instances.delete') }}</button>
+            <div class="sidebar-name">{{ selectedInstance.name }}</div>
+            <div class="sidebar-actions">
+              <el-button
+                size="small" type="primary"
+                :disabled="!!runningStates[selectedInstance.id]"
+                @click="startInstance"
+              >
+                <span class="btn-inner"><el-icon><VideoPlay /></el-icon>{{ $t('instances.start') }}</span>
+              </el-button>
+              <el-button
+                size="small"
+                :type="stopRequested[selectedInstance.id] ? 'warning' : 'default'"
+                :disabled="!runningStates[selectedInstance.id] && !stopRequested[selectedInstance.id]"
+                @click="stopInstance"
+              >
+                <span class="btn-inner"><el-icon><VideoPause /></el-icon>{{ stopRequested[selectedInstance.id] ? $t('instances.force_stop') : $t('instances.stop') }}</span>
+              </el-button>
+              <el-button size="small" plain @click="openTerminal">
+                <span class="btn-inner"><el-icon><Monitor /></el-icon>{{ $t('instances.open_terminal') }}</span>
+              </el-button>
+              <el-button size="small" plain @click="openInstanceFolder">
+                <span class="btn-inner"><el-icon><FolderOpened /></el-icon>{{ $t('instances.open_folder') }}</span>
+              </el-button>
+              <el-button size="small" plain @click="openEditInstance">
+                <span class="btn-inner"><el-icon><Edit /></el-icon>{{ $t('instances.edit') }}</span>
+              </el-button>
+              <el-button size="small" type="danger" plain @click="openDeleteConfirm">
+                <span class="btn-inner"><el-icon><Delete /></el-icon>{{ $t('instances.delete') }}</span>
+              </el-button>
             </div>
           </template>
-          <div v-else class="fm-empty">{{ $t('instances.select_hint') }}</div>
-        </div>
+          <div v-else class="sidebar-empty">{{ $t('instances.select_hint') }}</div>
+        </el-card>
       </template>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, inject, type Ref, type ComputedRef } from 'vue';
+import { defineComponent, ref, inject, type Ref, type ComputedRef } from 'vue';
+import {
+  Plus, FolderOpened, Upload, Setting, ArrowLeft,
+  QuestionFilled, ChatDotRound, Sunny, Moon, SwitchButton,
+  VideoPlay, VideoPause, Monitor, Edit, Delete,
+} from '@element-plus/icons-vue';
 
 export default defineComponent({
+  components: {
+    Plus, FolderOpened, Upload, Setting, ArrowLeft,
+    QuestionFilled, ChatDotRound, Sunny, Moon, SwitchButton,
+    VideoPlay, VideoPause, Monitor, Edit, Delete,
+  },
   setup() {
+    // ── 主题 ──
+    const isDark = ref(document.documentElement.classList.contains('dark'));
+
+    function toggleTheme(): void {
+      isDark.value = !isDark.value;
+      document.documentElement.classList.toggle('dark', isDark.value);
+      document.cookie = `YPanelTheme=${isDark.value ? 'dark' : 'light'}; path=/; max-age=${365 * 24 * 60 * 60}; SameSite=Lax`;
+    }
+
+    // ── inject ──
     const nodes = inject<Ref<any[]>>('nodes')!;
     const activeNodeId = inject<Ref<number | null>>('activeNodeId')!;
     const activeId = inject<Ref<number>>('activeId')!;
@@ -108,6 +203,7 @@ export default defineComponent({
     }
 
     return {
+      isDark, toggleTheme,
       nodes, activeNodeId, activeId, instances,
       selectedNodeId, selectedNodeForMenu, selectedInstance,
       runningStates, stopRequested,

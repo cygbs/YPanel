@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import yaml from 'js-yaml';
+import AutoImport from 'unplugin-auto-import/vite';
+import Components from 'unplugin-vue-components/vite';
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers';
 
 /** Vite 插件：将 .yml 文件转换为 ES module */
 function yamlPlugin() {
@@ -19,7 +22,16 @@ function yamlPlugin() {
 
 export default defineConfig({
   root: 'src',
-  plugins: [vue(), yamlPlugin()],
+  plugins: [
+    vue(),
+    yamlPlugin(),
+    AutoImport({
+      resolvers: [ElementPlusResolver()],
+    }),
+    Components({
+      resolvers: [ElementPlusResolver()],
+    }),
+  ],
   publicDir: '../public',
   build: {
     outDir: '../dist/public',
