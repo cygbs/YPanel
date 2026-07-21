@@ -1,49 +1,36 @@
-/* YPanel 全局样式 — 对话框 & 表单控件 */
+/* YPanel 全局样式 — 对话框（Element Plus el-dialog 适配） & 表单控件 */
 
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
+/* el-dialog 主题跟随 */
+.el-dialog {
+  --el-dialog-border-radius: 6px;
+  --el-dialog-title-font-size: 16px;
 }
-.dialog {
-  background: #1e1e3a;
-  border-radius: 10px;
-  width: 500px;
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-.dialog-sm { width: 400px; }
-.dialog-title {
-  padding: 16px 20px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #e0e0e0;
-}
-.dialog-body {
+.el-dialog__header { padding-bottom: 0; }
+.el-dialog__body {
   padding: 16px 20px;
-  overflow-y: auto;
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 0 20px 16px;
-}
+.el-dialog__footer { padding: 0 20px 16px; }
+
 .delete-warning {
   font-size: 13px;
   color: #aaa;
   line-height: 1.6;
   margin: 0;
+}
+
+/* el-input monospace 变体（用于路径、命令等代码文本） */
+.mono-input .el-input__inner {
+  font-family: Menlo, Monaco, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+/* el-input 校验错误态 */
+.el-input.invalid .el-input__wrapper {
+  border-color: #ff5555;
+  box-shadow: 0 0 0 1px #ff5555 inset;
 }
 
 /* 表单 */
@@ -128,22 +115,22 @@
   gap: 8px;
   height: 34px;
   padding: 0 10px;
-  background: #12122a;
-  border: 1px solid #2a2a4a;
+  background: var(--el-fill-color);
+  border: 1px solid var(--el-border-color);
   border-radius: 5px;
   cursor: pointer;
   transition: border-color 0.15s;
 }
-.icon-selector:hover { border-color: #6272a4; }
+.icon-selector:hover { border-color: var(--el-color-primary); }
 .icon-preview { width: 20px; height: 20px; }
-.icon-name { font-size: 12px; color: #aaa; }
+.icon-name { font-size: 12px; color: var(--el-text-color-secondary); }
 .icon-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   gap: 6px;
   padding: 10px;
-  background: #12122a;
-  border: 1px solid #2a2a4a;
+  background: var(--el-fill-color);
+  border: 1px solid var(--el-border-color);
   border-radius: 5px;
   margin-top: 4px;
 }
@@ -156,8 +143,8 @@
   cursor: pointer;
   transition: background 0.1s;
 }
-.icon-option:hover { background: #2a2a4a; }
-.icon-option.selected { background: #3a3a6a; }
+.icon-option:hover { background: var(--el-fill-color-light); }
+.icon-option.selected { background: var(--el-color-primary-light-9); }
 .icon-option img { width: 24px; height: 24px; }
 
 /* 按钮 */

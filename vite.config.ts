@@ -36,5 +36,12 @@ export default defineConfig({
   build: {
     outDir: '../dist/public',
     emptyOutDir: true,
+    rolldownOptions: {
+      onwarn(warning: { code?: string; message?: string }, warn: (w: unknown) => void) {
+        // Rolldown 对 /* #__PURE__ */ 位置更严格，压制 node_modules 中第三方库的误报
+        if (warning.code === 'INVALID_ANNOTATION') return;
+        warn(warning);
+      },
+    },
   },
 });

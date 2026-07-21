@@ -1,103 +1,95 @@
 <!-- 本源代码文件是YPanel项目的一部分，版权所有 (C) cygbs 2026。本项目遵循AGPL-3.0-or-later许可证。 -->
 <template>
   <!-- 新建/编辑实例 -->
-  <div v-if="showNewDialog" class="dialog-overlay" @click.self="closeNewDialog">
-    <div class="dialog">
-      <div class="dialog-title">{{ isEditing ? $t('instance_form.title_edit') : $t('instance_form.title_create') }}</div>
-      <div class="dialog-body">
-        <label class="field">
-          <span class="field-label">{{ $t('instance_form.name') }}</span>
-          <input v-model="newData.name" type="text" class="input" :class="{ invalid: errors.name }"
-            :placeholder="$t('instance_form.name_placeholder')" />
-          <span v-if="errors.name" class="field-error">{{ $t('instance_form.required') }}</span>
-        </label>
-        <label class="field">
-          <span class="field-label">{{ $t('instance_form.uuid') }}</span>
-          <input :value="newData.uuid" type="text" class="input mono" readonly />
-        </label>
-        <label class="field">
-          <span class="field-label">{{ $t('instance_form.icon') }}</span>
-          <div class="icon-selector" @click="showInstanceIconPicker = !showInstanceIconPicker">
-            <img class="icon-preview" :src="'/assets/instances/' + newData.icon" :alt="newData.icon" />
-            <span class="icon-name">{{ newData.icon }}</span>
-          </div>
-          <div v-if="showInstanceIconPicker" class="icon-grid">
-            <div v-for="icon in icons" :key="icon" class="icon-option"
-              :class="{ selected: icon === newData.icon }" @click="pickIcon(icon)">
-              <img :src="'/assets/instances/' + icon" :alt="icon" />
-            </div>
-          </div>
-        </label>
-        <label class="field">
-          <span class="field-label">{{ $t('instance_form.command') }}
-            <span v-if="isEditingLocked" class="field-hint">{{ $t('instance_form.command_lock') }}</span>
-          </span>
-          <input v-model="newData.command" type="text" class="input mono"
-            :class="{ invalid: errors.command }" :disabled="isEditingLocked" placeholder="java -jar xxx.jar" />
-          <span v-if="errors.command" class="field-error">{{ $t('instance_form.required') }}</span>
-        </label>
-        <label class="field">
-          <span class="field-label">{{ $t('instance_form.folder') }}
-            <span v-if="isEditingLocked" class="field-hint">{{ $t('instance_form.folder_lock') }}</span>
-          </span>
-          <input v-model="newData.folder" type="text" class="input mono"
-            :class="{ invalid: errors.folder }" :disabled="isEditingLocked" placeholder="path/to/your/folder" />
-          <span v-if="errors.folder" class="field-error">{{ $t('instance_form.required') }}</span>
-        </label>
-        <label class="field">
-          <span class="field-label">{{ $t('instance_form.stop_command') }}</span>
-          <input v-model="newData.stopCommand" type="text" class="input mono" placeholder="^C" />
-        </label>
-        <label class="field field-row">
-          <input type="checkbox" class="checkbox" v-model="newData.autoStart" />
-          <span class="field-label">{{ $t('instance_form.auto_start') }}</span>
-        </label>
+  <el-dialog v-model="showNewDialog" width="500px"
+    :title="isEditing ? $t('instance_form.title_edit') : $t('instance_form.title_create')"
+    :close-on-click-modal="true" @closed="closeNewDialog">
+    <label class="field">
+      <span class="field-label">{{ $t('instance_form.name') }}</span>
+      <el-input v-model="newData.name" :class="{ invalid: errors.name }"
+        :placeholder="$t('instance_form.name_placeholder')" />
+      <span v-if="errors.name" class="field-error">{{ $t('instance_form.required') }}</span>
+    </label>
+    <label class="field">
+      <span class="field-label">{{ $t('instance_form.uuid') }}</span>
+      <el-input :model-value="newData.uuid" readonly class="mono-input" />
+    </label>
+    <label class="field">
+      <span class="field-label">{{ $t('instance_form.icon') }}</span>
+      <div class="icon-selector" @click="showInstanceIconPicker = !showInstanceIconPicker">
+        <img class="icon-preview" :src="'/assets/instances/' + newData.icon" :alt="newData.icon" />
+        <span class="icon-name">{{ newData.icon }}</span>
       </div>
-      <div class="dialog-actions">
-        <button class="btn btn-secondary" @click="closeNewDialog">{{ $t('cancel') }}</button>
-        <button class="btn btn-primary" :disabled="saving" @click="createInstance">
-          {{ saving ? $t('saving') : isEditing ? $t('save') : $t('instance_form.create') }}
-        </button>
+      <div v-if="showInstanceIconPicker" class="icon-grid">
+        <div v-for="icon in icons" :key="icon" class="icon-option"
+          :class="{ selected: icon === newData.icon }" @click="pickIcon(icon)">
+          <img :src="'/assets/instances/' + icon" :alt="icon" />
+        </div>
       </div>
-    </div>
-  </div>
+    </label>
+    <label class="field">
+      <span class="field-label">{{ $t('instance_form.command') }}
+        <span v-if="isEditingLocked" class="field-hint">{{ $t('instance_form.command_lock') }}</span>
+      </span>
+      <el-input v-model="newData.command" :disabled="isEditingLocked"
+        :class="{ invalid: errors.command }" class="mono-input" placeholder="java -jar xxx.jar" />
+      <span v-if="errors.command" class="field-error">{{ $t('instance_form.required') }}</span>
+    </label>
+    <label class="field">
+      <span class="field-label">{{ $t('instance_form.folder') }}
+        <span v-if="isEditingLocked" class="field-hint">{{ $t('instance_form.folder_lock') }}</span>
+      </span>
+      <el-input v-model="newData.folder" :disabled="isEditingLocked"
+        :class="{ invalid: errors.folder }" class="mono-input" placeholder="path/to/your/folder" />
+      <span v-if="errors.folder" class="field-error">{{ $t('instance_form.required') }}</span>
+    </label>
+    <label class="field">
+      <span class="field-label">{{ $t('instance_form.stop_command') }}</span>
+      <el-input v-model="newData.stopCommand" class="mono-input" placeholder="^C" />
+    </label>
+    <label class="field field-row">
+      <el-checkbox v-model="newData.autoStart" :label="$t('instance_form.auto_start')" />
+    </label>
+    <template #footer>
+      <el-button @click="closeNewDialog">{{ $t('cancel') }}</el-button>
+      <el-button type="primary" :loading="saving" @click="createInstance">
+        {{ saving ? $t('saving') : isEditing ? $t('save') : $t('instance_form.create') }}
+      </el-button>
+    </template>
+  </el-dialog>
 
   <!-- 设置 -->
-  <div v-if="showSettings" class="dialog-overlay" @click.self="closeSettings">
-    <div class="dialog">
-      <div class="dialog-title">{{ $t('node_settings.title', { name: activeNode?.name || 'Node' }) }}</div>
-      <div class="dialog-body">
-        <label class="field">
-          <span class="field-label">{{ $t('node_settings.default_shell') }}</span>
-          <input v-model="settings.defaultShell" type="text" class="input mono"
-            :placeholder="$t('node_settings.shell_placeholder')" />
-        </label>
-        <label class="field">
-          <span class="field-label">{{ $t('node_settings.text_editor') }}</span>
-          <input v-model="settings.textEditor" type="text" class="input mono"
-            :placeholder="$t('node_settings.editor_placeholder')" />
-        </label>
-      </div>
-      <div class="dialog-actions">
-        <button class="btn btn-secondary" @click="closeSettings">{{ $t('cancel') }}</button>
-        <button class="btn btn-primary" :disabled="savingSettings" @click="saveSettings">
-          {{ savingSettings ? $t('saving') : $t('save') }}
-        </button>
-      </div>
-    </div>
-  </div>
+  <el-dialog v-model="showSettings" width="500px"
+    :title="$t('node_settings.title', { name: activeNode?.name || 'Node' })"
+    :close-on-click-modal="true" @closed="closeSettings">
+    <label class="field">
+      <span class="field-label">{{ $t('node_settings.default_shell') }}</span>
+      <el-input v-model="settings.defaultShell" class="mono-input"
+        :placeholder="$t('node_settings.shell_placeholder')" />
+    </label>
+    <label class="field">
+      <span class="field-label">{{ $t('node_settings.text_editor') }}</span>
+      <el-input v-model="settings.textEditor" class="mono-input"
+        :placeholder="$t('node_settings.editor_placeholder')" />
+    </label>
+    <template #footer>
+      <el-button @click="closeSettings">{{ $t('cancel') }}</el-button>
+      <el-button type="primary" :loading="savingSettings" @click="saveSettings">
+        {{ savingSettings ? $t('saving') : $t('save') }}
+      </el-button>
+    </template>
+  </el-dialog>
 
   <!-- 删除实例确认 -->
-  <div v-if="showDeleteConfirm" class="dialog-overlay" @click.self="cancelDelete">
-    <div class="dialog dialog-sm">
-      <div class="dialog-title">{{ $t('delete_instance.title') }}</div>
-      <div class="dialog-body"><p class="delete-warning">{{ $t('delete_instance.body') }}</p></div>
-      <div class="dialog-actions">
-        <button class="btn btn-secondary" @click="cancelDelete">{{ $t('delete_instance.cancel') }}</button>
-        <button class="btn btn-danger" @click="confirmDelete">{{ $t('delete_instance.confirm') }}</button>
-      </div>
-    </div>
-  </div>
+  <el-dialog v-model="showDeleteConfirm" width="400px"
+    :title="$t('delete_instance.title')"
+    :close-on-click-modal="true" @closed="cancelDelete">
+    <p class="delete-warning">{{ $t('delete_instance.body') }}</p>
+    <template #footer>
+      <el-button @click="cancelDelete">{{ $t('delete_instance.cancel') }}</el-button>
+      <el-button type="danger" @click="confirmDelete">{{ $t('delete_instance.confirm') }}</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script lang="ts">

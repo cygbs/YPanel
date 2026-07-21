@@ -1,19 +1,15 @@
 <!-- 本源代码文件是YPanel项目的一部分，版权所有 (C) cygbs 2026。本项目遵循AGPL-3.0-or-later许可证。 -->
 <template>
-  <div v-if="showLangDialog" class="dialog-overlay" @click.self="closeLangDialog">
-    <div class="dialog dialog-sm">
-      <div class="dialog-title">{{ $t('lang.select') }}</div>
-      <div class="dialog-body">
-        <div v-for="code in localeCodes" :key="code" class="lang-option"
-          :class="{ selected: code === locale }" @click="setLang(code)">
-          <span class="lang-option-name">{{ messages[code].name }}</span>
-        </div>
-      </div>
-      <div class="dialog-actions">
-        <button class="btn btn-secondary" @click="closeLangDialog">{{ $t('cancel') }}</button>
-      </div>
+  <el-dialog v-model="showLangDialog" :title="$t('lang.select')" width="400px"
+    :close-on-click-modal="true" @closed="closeLangDialog">
+    <div v-for="code in localeCodes" :key="code" class="lang-option"
+      :class="{ selected: code === locale }" @click="setLang(code)">
+      <span class="lang-option-name">{{ messages[code].name }}</span>
     </div>
-  </div>
+    <template #footer>
+      <el-button @click="closeLangDialog">{{ $t('cancel') }}</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script lang="ts">

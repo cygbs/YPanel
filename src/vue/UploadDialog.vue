@@ -1,57 +1,53 @@
 <!-- 本源代码文件是YPanel项目的一部分，版权所有 (C) cygbs 2026。本项目遵循AGPL-3.0-or-later许可证。 -->
 <template>
-  <div v-if="showUploadDialog" class="dialog-overlay" @click.self="cancelUpload">
-    <div class="dialog">
-      <div class="dialog-title">{{ $t('upload.title') }}</div>
-      <div class="dialog-body">
-        <template v-if="!uploadFile">
-          <div class="upload-dropzone" @click="triggerFileInput" @dragover.prevent @drop.prevent="onFileDrop">
-            <div class="upload-hint">{{ $t('upload.dropzone_hint') }}</div>
-          </div>
-          <input ref="fileInputRef" type="file" class="upload-input-hidden" @change="onFileSelected" />
-        </template>
-        <template v-else>
-          <label class="field">
-            <span class="field-label">{{ $t('upload.file') }}</span>
-            <input type="text" class="input mono" :value="uploadFile.name" readonly />
-          </label>
-          <label class="field">
-            <span class="field-label">{{ $t('upload.size') }}</span>
-            <input type="text" class="input" :value="formatSize(uploadFile.size)" readonly />
-          </label>
-          <label class="field">
-            <span class="field-label">{{ $t('upload.path_hint') }}</span>
-            <input v-model="uploadPath" type="text" class="input mono"
-              :placeholder="$t('upload.path_placeholder')" />
-          </label>
-          <div v-if="uploadStatus" class="upload-status-area">
-            <div class="upload-progress-bar">
-              <div class="upload-progress-fill" :style="{ width: uploadProgress + '%' }"></div>
-            </div>
-            <div class="upload-progress-text">
-              <template v-if="uploadStatus === 'uploading'">
-                {{ $t('upload.uploading', { received: formatSize(uploadReceived), total: formatSize(uploadTotal) }) }}
-              </template>
-              <template v-else-if="uploadStatus === 'complete'">{{ $t('upload.complete') }}</template>
-              <template v-else-if="uploadStatus === 'error'">{{ uploadError }}</template>
-            </div>
-          </div>
-        </template>
+  <el-dialog v-model="showUploadDialog" :title="$t('upload.title')" width="500px"
+    :close-on-click-modal="true" @closed="cancelUpload">
+    <template v-if="!uploadFile">
+      <div class="upload-dropzone" @click="triggerFileInput" @dragover.prevent @drop.prevent="onFileDrop">
+        <div class="upload-hint">{{ $t('upload.dropzone_hint') }}</div>
       </div>
-      <div class="dialog-actions">
-        <template v-if="!uploadFile">
-          <button class="btn btn-secondary" @click="cancelUpload">{{ $t('upload.close') }}</button>
-        </template>
-        <template v-else-if="uploadStatus === 'idle' || uploadStatus === 'error'">
-          <button class="btn btn-secondary" @click="cancelUpload">{{ $t('upload.cancel') }}</button>
-          <button class="btn btn-primary" @click="startUpload">{{ $t('upload.upload') }}</button>
-        </template>
-        <template v-else-if="uploadStatus === 'complete'">
-          <button class="btn btn-primary" @click="cancelUpload">{{ $t('upload.done') }}</button>
-        </template>
+      <input ref="fileInputRef" type="file" class="upload-input-hidden" @change="onFileSelected" />
+    </template>
+    <template v-else>
+      <label class="field">
+        <span class="field-label">{{ $t('upload.file') }}</span>
+        <el-input :model-value="uploadFile.name" readonly class="mono-input" />
+      </label>
+      <label class="field">
+        <span class="field-label">{{ $t('upload.size') }}</span>
+        <el-input :model-value="formatSize(uploadFile.size)" readonly />
+      </label>
+      <label class="field">
+        <span class="field-label">{{ $t('upload.path_hint') }}</span>
+        <el-input v-model="uploadPath" class="mono-input"
+          :placeholder="$t('upload.path_placeholder')" />
+      </label>
+      <div v-if="uploadStatus" class="upload-status-area">
+        <div class="upload-progress-bar">
+          <div class="upload-progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+        </div>
+        <div class="upload-progress-text">
+          <template v-if="uploadStatus === 'uploading'">
+            {{ $t('upload.uploading', { received: formatSize(uploadReceived), total: formatSize(uploadTotal) }) }}
+          </template>
+          <template v-else-if="uploadStatus === 'complete'">{{ $t('upload.complete') }}</template>
+          <template v-else-if="uploadStatus === 'error'">{{ uploadError }}</template>
+        </div>
       </div>
-    </div>
-  </div>
+    </template>
+    <template #footer>
+      <template v-if="!uploadFile">
+        <el-button @click="cancelUpload">{{ $t('upload.close') }}</el-button>
+      </template>
+      <template v-else-if="uploadStatus === 'idle' || uploadStatus === 'error'">
+        <el-button @click="cancelUpload">{{ $t('upload.cancel') }}</el-button>
+        <el-button type="primary" @click="startUpload">{{ $t('upload.upload') }}</el-button>
+      </template>
+      <template v-else-if="uploadStatus === 'complete'">
+        <el-button type="primary" @click="cancelUpload">{{ $t('upload.done') }}</el-button>
+      </template>
+    </template>
+  </el-dialog>
 </template>
 
 <script lang="ts">
