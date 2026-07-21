@@ -35,45 +35,45 @@
 
 /* 表单 */
 .field { display: flex; flex-direction: column; gap: 4px; }
-.field-label { font-size: 12px; color: #999; }
-.field-error { font-size: 11px; color: #ff5555; }
-.field-hint { font-size: 11px; color: #888; font-weight: normal; }
+.field-label { font-size: 12px; color: var(--el-text-color-secondary); }
+.field-error { font-size: 11px; color: var(--el-color-danger); }
+.field-hint { font-size: 11px; color: var(--el-text-color-placeholder); font-weight: normal; }
 .field-row { flex-direction: row !important; align-items: center !important; gap: 8px !important; }
 
 .input {
   height: 34px;
   padding: 0 10px;
-  background: #12122a;
-  border: 1px solid #2a2a4a;
+  background: var(--el-fill-color);
+  border: 1px solid var(--el-border-color);
   border-radius: 5px;
-  color: #e0e0e0;
+  color: var(--el-text-color-regular);
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s;
 }
-.input:focus { border-color: #6272a4; }
-.input.invalid { border-color: #ff5555; }
+.input:focus { border-color: var(--el-color-primary); }
+.input.invalid { border-color: var(--el-color-danger); }
 .input:disabled { opacity: 0.4; cursor: not-allowed; }
 .input.mono { font-family: Menlo, Monaco, 'Courier New', monospace; font-size: 12px; }
-.input[readonly] { color: #777; cursor: default; }
+.input[readonly] { color: var(--el-text-color-placeholder); cursor: default; }
 
 .input-with-prefix {
   display: flex;
   align-items: center;
   height: 34px;
-  background: #12122a;
-  border: 1px solid #2a2a4a;
+  background: var(--el-fill-color);
+  border: 1px solid var(--el-border-color);
   border-radius: 5px;
   overflow: hidden;
 }
-.input-with-prefix:focus-within { border-color: #6272a4; }
+.input-with-prefix:focus-within { border-color: var(--el-color-primary); }
 .input-prefix {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   flex-shrink: 0;
-  color: #777;
+  color: var(--el-text-color-placeholder);
   font-size: 14px;
   font-family: Menlo, Monaco, 'Courier New', monospace;
   user-select: none;
@@ -88,10 +88,10 @@
 .textarea {
   width: 100%;
   padding: 10px;
-  background: #12122a;
-  border: 1px solid #2a2a4a;
+  background: var(--el-fill-color);
+  border: 1px solid var(--el-border-color);
   border-radius: 5px;
-  color: #e0e0e0;
+  color: var(--el-text-color-regular);
   font-size: 12px;
   font-family: Menlo, Monaco, 'Courier New', monospace;
   outline: none;
@@ -99,7 +99,7 @@
   line-height: 1.5;
   transition: border-color 0.15s;
 }
-.textarea:focus { border-color: #6272a4; }
+.textarea:focus { border-color: var(--el-color-primary); }
 
 .checkbox {
   width: 16px; height: 16px;
