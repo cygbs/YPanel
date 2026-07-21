@@ -23,7 +23,21 @@
   font-family: Menlo, Monaco, 'Courier New', monospace !important;
   font-size: 12px !important;
 }
-.fm-toolbar .fm-actions { flex-shrink: 0; display: flex; gap: 4px; justify-content: flex-end; }
+.fm-toolbar .fm-actions {
+  width: 21%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+.fm-toolbar .fm-actions .fm-btn-sm {
+  flex: 1;
+  min-width: 0;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .fm-btn-sm {
   height: 28px;
   padding: 0 10px;
