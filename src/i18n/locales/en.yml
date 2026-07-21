@@ -18,6 +18,10 @@ login:
   password: Password
   login: Log in
   failed: Login failed
+  forgot_password: Forgot password?
+  forgot_password_title: Forgot Password
+  forgot_password_body: You can delete data/auth.json in the Hub directory and restart the Hub to reset the password. The new random password will be printed in the logs.
+  ok: Got it
 
 # ── Change Default Password ──
 change_password:

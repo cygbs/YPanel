@@ -29,6 +29,15 @@
       <el-button type="primary" size="large" class="auth-btn" @click="login">
         {{ $t('login.login') }}
       </el-button>
+      <a class="auth-forgot" @click="forgotPassword">{{ $t('login.forgot_password') }}</a>
+      <div class="auth-bottom-row">
+        <el-button size="small" class="auth-icon-btn" @click="toggleTheme">
+          <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
+        </el-button>
+        <el-button size="small" class="auth-icon-btn" @click="cycleLocale">
+          <span class="btn-inner"><el-icon><ChatDotRound /></el-icon>{{ localeLabel }}</span>
+        </el-button>
+      </div>
     </el-card>
   </div>
 
@@ -79,10 +88,13 @@
 
 <script lang="ts">
 import { defineComponent, ref, inject, type Ref } from 'vue';
-import { Loading, Lock } from '@element-plus/icons-vue';
+import { useI18n } from 'vue-i18n';
+import { Loading, Lock, Sunny, Moon, ChatDotRound } from '@element-plus/icons-vue';
+
+const LOCALE_CODES = ['zh-CN', 'zh-TW', 'lzh', 'en'] as const;
 
 export default defineComponent({
-  components: { Loading, Lock },
+  components: { Loading, Lock, Sunny, Moon, ChatDotRound },
   setup() {
     const authState = inject<Ref<string>>('authState')!;
     const loginPassword = inject<Ref<string>>('loginPassword')!;
@@ -95,7 +107,50 @@ export default defineComponent({
     const doLogin = inject<() => Promise<void>>('doLogin')!;
     const doChangePassword = inject<() => Promise<void>>('doChangePassword')!;
 
+    const { t, locale } = useI18n();
+
     checkAuth();
+
+    // ── 主题切换 ──
+    const isDark = ref(document.documentElement.classList.contains('dark'));
+
+    function toggleTheme(): void {
+      isDark.value = !isDark.value;
+      document.documentElement.classList.toggle('dark', isDark.value);
+      document.cookie = `YPanelTheme=${isDark.value ? 'dark' : 'light'}; path=/; max-age=${365 * 24 * 60 * 60}; SameSite=Lax`;
+    }
+
+    // ── 语言切换 ──
+    const localeLabel = ref('');
+
+    function setLang(code: string): void {
+      document.cookie = `YPanelLang=${encodeURIComponent(code)}; path=/; max-age=${365 * 24 * 60 * 60}; SameSite=Lax`;
+      locale.value = code;
+    }
+
+    function updateLocaleLabel(): void {
+      const maps: Record<string, string> = {
+        'zh-CN': '中文', 'zh-TW': '繁體', lzh: '文言', en: 'EN',
+      };
+      localeLabel.value = maps[locale.value as string] || locale.value as string;
+    }
+
+    function cycleLocale(): void {
+      const idx = LOCALE_CODES.indexOf(locale.value as typeof LOCALE_CODES[number]);
+      const next = LOCALE_CODES[(idx + 1) % LOCALE_CODES.length];
+      setLang(next);
+      updateLocaleLabel();
+    }
+
+    updateLocaleLabel();
+
+    // ── 忘记密码 ──
+    function forgotPassword(): void {
+      ElMessageBox.alert(t('login.forgot_password_body'), t('login.forgot_password_title'), {
+        confirmButtonText: t('login.ok'),
+        type: 'info',
+      });
+    }
 
     return {
       authState,
@@ -107,6 +162,11 @@ export default defineComponent({
       changing: changingPassword,
       login: doLogin,
       change: doChangePassword,
+      isDark,
+      toggleTheme,
+      cycleLocale,
+      localeLabel,
+      forgotPassword,
     };
   },
 });

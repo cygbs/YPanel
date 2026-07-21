@@ -18,6 +18,10 @@ login:
   password: 密碼
   login: 登入
   failed: 登入失敗
+  forgot_password: 忘記密碼？
+  forgot_password_title: 忘記密碼
+  forgot_password_body: 可以刪除Hub端目錄下的data/auth.json並重新啟動Hub端來重設密碼，新隨機密碼將會列印在日誌中。
+  ok: 知道了
 
 # ── 修改預設密碼 ──
 change_password:

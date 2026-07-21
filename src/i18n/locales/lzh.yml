@@ -18,6 +18,10 @@ login:
   password: 密鑰
   login: 入
   failed: 入敗
+  forgot_password: 忘密？
+  forgot_password_title: 忘密
+  forgot_password_body: 可刪Hub端目錄下之data/auth.json，重啟Hub端以重設密鑰。新隨機密鑰將印於日誌中。
+  ok: 知之
 
 # ── 易密 ──
 change_password:

@@ -53,6 +53,44 @@
   text-align: center;
 }
 
+/* 忘记密码 */
+.auth-forgot {
+  display: block;
+  text-align: center;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  cursor: pointer;
+  text-decoration: none;
+  margin-top: -8px;
+}
+.auth-forgot:hover {
+  color: var(--el-color-primary);
+}
+
+/* 登录卡片底部操作栏（主题+语言） */
+.auth-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.auth-icon-btn {
+  border: none;
+  background: transparent;
+  color: var(--el-text-color-secondary);
+  padding: 4px 6px;
+  min-height: auto;
+}
+.auth-icon-btn:hover {
+  color: var(--el-color-primary);
+  background: transparent;
+}
+.auth-icon-btn .btn-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* 加载中 */
 .auth-loading-icon {
   color: var(--el-color-primary);
