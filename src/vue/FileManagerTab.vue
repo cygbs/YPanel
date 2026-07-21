@@ -299,6 +299,7 @@ export default defineComponent({
           confirmButtonText: t('fm.delete_confirm_btn'),
           cancelButtonText: t('cancel'),
           type: 'warning',
+          confirmButtonType: 'danger',
         });
         doDelete(fullPath);
       } catch { /* cancelled */ }
