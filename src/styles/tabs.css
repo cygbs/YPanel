@@ -1,77 +1,44 @@
-/* YPanel 全局样式 — 标签栏 */
+/* YPanel 全局样式 — 标签栏（Element Plus el-tabs card 暗色适配） */
 
-.tab-bar {
-  display: flex;
-  align-items: stretch;
-  background: #0f0f1e;
-  height: 42px;
+.tab-bar-el {
+  --el-tabs-header-height: 37px;
   flex-shrink: 0;
-  user-select: none;
 }
-.tabs-scroll {
+.tab-bar-el .el-tabs__header {
+  margin: 0;
+  background: var(--el-bg-color-page);
+  border-bottom: none;
+}
+.tab-bar-el .el-tabs__nav-wrap::after {
+  display: none;
+}
+.tab-bar-el .el-tabs__item {
+  height: 37px;
+  line-height: 37px;
+  font-size: 13px;
+  border-left: none;
+}
+.tab-bar-el .el-tabs__item.is-active {
+  color: var(--el-text-color-primary);
+}
+.tab-bar-el .el-tabs__item.is-active::before {
+  background: var(--el-color-primary);
+}
+
+/* 新建标签页按钮 — 填满剩余区域 */
+.tab-bar-el .el-tabs__new-tab {
   flex: 1;
   display: flex;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0 2px;
-}
-.tabs-scroll::-webkit-scrollbar { height: 4px; }
-.tabs-scroll::-webkit-scrollbar-track { background: transparent; }
-.tabs-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-}
-.tab {
-  display: flex;
-  align-items: center;
-  flex: 0 1 180px;
-  min-width: 80px;
-  width: 180px;
-  padding: 0 6px 0 12px;
-  background: #1a1a2e;
-  cursor: pointer;
-  color: #888;
-  font-size: 13px;
-  transition: background 0.15s, color 0.15s;
-}
-.tab:hover { background: #22223a; color: #ccc; }
-.tab.active {
-  background: #1a1a2e;
-  color: #e0e0e0;
-  box-shadow: 0 -1px 0 #50fa7b inset;
-}
-.tab-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 120px;
-}
-.tab-close {
-  margin-left: auto;
-  width: 24px; height: 24px;
-  display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  font-size: 18px;
-  line-height: 1;
-  color: #666;
-  flex-shrink: 0;
-}
-.tab-close:hover {
-  background: rgba(255, 85, 85, 0.25);
-  color: #ff5555;
-}
-.tab-add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  flex-shrink: 0;
-  cursor: pointer;
-  color: #666;
-  font-size: 22px;
-  line-height: 1;
+  height: 37px;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  color: var(--el-text-color-secondary);
   transition: background 0.15s, color 0.15s;
 }
-.tab-add:hover { background: #22223a; color: #50fa7b; }
+.tab-bar-el .el-tabs__new-tab:hover {
+  background: var(--el-fill-color-light);
+  color: var(--el-color-primary);
+}

@@ -6,18 +6,22 @@
   <!-- ===== 主界面 ===== -->
   <div v-else class="app-layout">
     <!-- 标签栏 -->
-    <div v-show="activeNodeId !== null" class="tab-bar">
-      <div class="tabs-scroll">
-        <div v-for="tab in tabs" :key="tab.id" class="tab"
-          :class="{ active: tab.id === activeId }"
-          @click="switchTab(tab.id)" @mousedown.middle="closeTab(tab.id)">
-          <span class="tab-label">{{ tab.title }}</span>
-          <span v-if="tab.type !== 'home'" class="tab-close"
-            @click.stop="closeTab(tab.id)" :title="$t('tab.close')">&times;</span>
-        </div>
-      </div>
-      <div class="tab-add" @click="addTerminalTab()" :title="$t('tab.new')">+</div>
-    </div>
+    <el-tabs v-show="activeNodeId !== null" v-model="activeId" type="card" editable
+      class="tab-bar-el"
+      @tab-add="addTerminalTab()"
+      @tab-remove="closeTab"
+    >
+      <el-tab-pane
+        v-for="tab in tabs"
+        :key="tab.id"
+        :name="tab.id"
+        :closable="tab.type !== 'home'"
+      >
+        <template #label>
+          <span @mousedown.middle.prevent="closeTab(tab.id)">{{ tab.title }}</span>
+        </template>
+      </el-tab-pane>
+    </el-tabs>
 
     <!-- 内容区 -->
     <div class="content-area">
