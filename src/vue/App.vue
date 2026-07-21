@@ -39,7 +39,6 @@
     <!-- 对话框 -->
     <NodeDialogs />
     <InstanceDialogs />
-    <UploadDialog />
     <HubSettingsDialog />
     <LangDialog />
     <ToastContainer />
@@ -53,7 +52,6 @@ import AuthScreen from './AuthScreen.vue';
 import HomeContent from './HomeContent.vue';
 import NodeDialogs from './NodeDialogs.vue';
 import InstanceDialogs from './InstanceDialogs.vue';
-import UploadDialog from './UploadDialog.vue';
 import HubSettingsDialog from './HubSettingsDialog.vue';
 import LangDialog from './LangDialog.vue';
 import ToastContainer from './ToastContainer.vue';
@@ -105,7 +103,7 @@ interface NewInstanceData {
 let nextTabId = 1;
 
 export default defineComponent({
-  components: { AuthScreen, HomeContent, NodeDialogs, InstanceDialogs, UploadDialog, HubSettingsDialog, LangDialog, ToastContainer, TerminalTab, FileManagerTab },
+  components: { AuthScreen, HomeContent, NodeDialogs, InstanceDialogs, HubSettingsDialog, LangDialog, ToastContainer, TerminalTab, FileManagerTab },
   setup() {
     const { t, locale } = useI18n();
 
@@ -520,61 +518,6 @@ export default defineComponent({
       finally { savingHubSettings.value = false; }
     }
 
-    // ── 文件上传 ──
-    const CHUNK_SIZE = 64 * 1024;
-    const showUploadDialog = ref(false);
-    const uploadFile = ref<File | null>(null);
-    const uploadPath = ref('');
-    const uploadStatus = ref<'idle' | 'uploading' | 'complete' | 'error'>('idle');
-    const uploadProgress = ref(0);
-    const uploadReceived = ref(0);
-    const uploadTotal = ref(0);
-    const uploadError = ref('');
-    const fileInputRef = ref<HTMLInputElement | null>(null);
-    let uploadWs: WebSocket | null = null;
-
-    function formatSize(bytes: number): string {
-      if (bytes === 0) return '0 B';
-      const units = ['B', 'KB', 'MB', 'GB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(1024));
-      return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
-    }
-
-    function openUploadDialog(): void {
-      showUploadDialog.value = true; uploadFile.value = null; uploadPath.value = '';
-      uploadStatus.value = 'idle'; uploadProgress.value = 0; uploadReceived.value = 0; uploadTotal.value = 0; uploadError.value = '';
-    }
-    function cancelUpload(): void { if (uploadWs) { uploadWs.close(); uploadWs = null; } showUploadDialog.value = false; uploadFile.value = null; uploadStatus.value = 'idle'; }
-    function triggerFileInput() { fileInputRef.value?.click(); }
-    function onFileSelected(e: Event) { const input = e.target as HTMLInputElement; if (input.files && input.files.length > 0) { uploadFile.value = input.files[0]; uploadStatus.value = 'idle'; } }
-    function onFileDrop(e: DragEvent) { const files = e.dataTransfer?.files; if (files && files.length > 0) { uploadFile.value = files[0]; uploadStatus.value = 'idle'; } }
-
-    function startUpload(): void {
-      const file = uploadFile.value; if (!file || activeNodeId.value === null) return;
-      uploadStatus.value = 'uploading'; uploadProgress.value = 0; uploadReceived.value = 0; uploadTotal.value = file.size;
-      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      uploadWs = new WebSocket(`${protocol}//${location.host}/upload?nodeId=${activeNodeId.value}`);
-      uploadWs.onopen = () => { uploadWs!.send(JSON.stringify({ type: 'upload_start', fileName: file.name, uploadPath: uploadPath.value, fileSize: file.size })); };
-      uploadWs.onmessage = async (event) => {
-        let msg: any; try { msg = JSON.parse(event.data); } catch { return; }
-        if (msg.type === 'upload_ack' && msg.status === 'ready') {
-          const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-          for (let i = 0; i < totalChunks; i++) {
-            if (!uploadWs || uploadWs.readyState !== WebSocket.OPEN) break;
-            const start = i * CHUNK_SIZE, end = Math.min(start + CHUNK_SIZE, file.size);
-            const chunk = file.slice(start, end), buffer = await chunk.arrayBuffer(), bytes = new Uint8Array(buffer);
-            let binary = ''; for (let j = 0; j < bytes.length; j++) binary += String.fromCharCode(bytes[j]);
-            uploadWs.send(JSON.stringify({ type: 'upload_chunk', data: btoa(binary), index: i, total: totalChunks, final: i === totalChunks - 1 }));
-            uploadReceived.value = end; uploadProgress.value = Math.round((end / file.size) * 100);
-          }
-        } else if (msg.type === 'upload_progress') { uploadReceived.value = msg.received; uploadProgress.value = Math.round((msg.received / msg.total) * 100); }
-        else if (msg.type === 'upload_complete') { uploadStatus.value = 'complete'; uploadProgress.value = 100; uploadWs?.close(); uploadWs = null; }
-        else if (msg.type === 'upload_error') { uploadStatus.value = 'error'; uploadError.value = msg.message || t('upload.failed'); uploadWs?.close(); uploadWs = null; }
-      };
-      uploadWs.onerror = () => { uploadStatus.value = 'error'; uploadError.value = t('upload.connection_failed'); uploadWs = null; };
-      uploadWs.onclose = () => { if (uploadStatus.value === 'uploading') { uploadStatus.value = 'error'; uploadError.value = t('upload.connection_lost'); } uploadWs = null; };
-    }
-
     // ── 事件 WS ──
     let eventsWs: WebSocket | null = null;
     let eventsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -702,16 +645,6 @@ export default defineComponent({
     provide('hubSecurityContent', hubSecurityContent); provide('savingHubSettings', savingHubSettings);
     provide('openHubSettings', openHubSettings); provide('closeHubSettings', closeHubSettings);
     provide('saveHubSettings', saveHubSettings);
-
-    // 上传
-    provide('showUploadDialog', showUploadDialog); provide('uploadFile', uploadFile);
-    provide('uploadPath', uploadPath); provide('uploadStatus', uploadStatus);
-    provide('uploadProgress', uploadProgress); provide('uploadReceived', uploadReceived);
-    provide('uploadTotal', uploadTotal); provide('uploadError', uploadError);
-    provide('openUploadDialog', openUploadDialog); provide('cancelUpload', cancelUpload);
-    provide('startUpload', startUpload); provide('triggerFileInput', triggerFileInput);
-    provide('onFileSelected', onFileSelected); provide('onFileDrop', onFileDrop);
-    provide('formatSize', formatSize);
 
     // 标签页
     provide('tabs', tabs); provide('activeId', activeId); provide('terminalTabs', terminalTabs);

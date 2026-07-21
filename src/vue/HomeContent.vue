@@ -22,9 +22,6 @@
           <el-button size="small" @click="openFileManager()">
             <span class="btn-inner"><el-icon><FolderOpened /></el-icon>{{ $t('quick.file_manager') }}</span>
           </el-button>
-          <el-button size="small" @click="openUploadDialog">
-            <span class="btn-inner"><el-icon><Upload /></el-icon>{{ $t('quick.upload_file') }}</span>
-          </el-button>
           <el-button size="small" @click="openSettings">
             <span class="btn-inner"><el-icon><Setting /></el-icon>{{ $t('quick.settings') }}</span>
           </el-button>
@@ -164,14 +161,14 @@
 <script lang="ts">
 import { defineComponent, ref, inject, type Ref, type ComputedRef } from 'vue';
 import {
-  Plus, FolderOpened, Upload, Setting, ArrowLeft,
+  Plus, FolderOpened, Setting, ArrowLeft,
   QuestionFilled, ChatDotRound, Sunny, Moon, SwitchButton,
   VideoPlay, VideoPause, Monitor, Edit, Delete,
 } from '@element-plus/icons-vue';
 
 export default defineComponent({
   components: {
-    Plus, FolderOpened, Upload, Setting, ArrowLeft,
+    Plus, FolderOpened, Setting, ArrowLeft,
     QuestionFilled, ChatDotRound, Sunny, Moon, SwitchButton,
     VideoPlay, VideoPause, Monitor, Edit, Delete,
   },
@@ -212,7 +209,6 @@ export default defineComponent({
       openNewInstance: inject('openNewInstance')!,
       openFileManager: inject('openFileManager')!,
       openInstanceFolder,
-      openUploadDialog: inject('openUploadDialog')!,
       openSettings: inject('openSettings')!,
       openNodeDialog: inject('openNodeDialog')!,
       openHubSettings: inject('openHubSettings')!,
