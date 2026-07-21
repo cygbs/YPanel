@@ -16,7 +16,7 @@
 
 .delete-warning {
   font-size: 13px;
-  color: #aaa;
+  color: var(--el-text-color-secondary);
   line-height: 1.6;
   margin: 0;
 }
@@ -29,8 +29,8 @@
 
 /* el-input 校验错误态 */
 .el-input.invalid .el-input__wrapper {
-  border-color: #ff5555;
-  box-shadow: 0 0 0 1px #ff5555 inset;
+  border-color: var(--el-color-danger);
+  box-shadow: 0 0 0 1px var(--el-color-danger) inset;
 }
 
 /* 表单 */
@@ -103,7 +103,7 @@
 
 .checkbox {
   width: 16px; height: 16px;
-  accent-color: #50fa7b;
+  accent-color: var(--el-color-primary);
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -164,5 +164,3 @@
 .btn-primary:hover { background: var(--el-color-primary-light-3); }
 .btn-danger { background: var(--el-color-danger); color: #fff; font-weight: 600; }
 .btn-danger:hover { background: var(--el-color-danger-light-3); }
-.btn-warning { background: var(--el-color-warning) !important; color: #fff !important; font-weight: 700; }
-.btn-warning:hover { background: var(--el-color-warning-light-3) !important; }

@@ -5,7 +5,6 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "typecheck:watch": "tsc --noEmit --watch",
     "build:client": "vite build",
     "build:hub": "esbuild src/hub.ts --bundle --platform=node --outfile=dist/index.js --minify",
     "build:node": "esbuild src/node.ts --bundle --platform=node --outfile=dist-node/index.js --external:zigpty --minify",

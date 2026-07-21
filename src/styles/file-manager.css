@@ -7,6 +7,9 @@
   flex-direction: column;
   background: var(--el-bg-color-page);
 }
+
+/* 隐藏文件上传 input */
+.upload-input-hidden { display: none; }
 .fm-toolbar {
   height: 38px;
   flex-shrink: 0;
