@@ -82,17 +82,21 @@
   padding: 0 10px;
   font-size: 13px;
   color: #ccc;
-  border-bottom: 1px solid #1a1a3a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: middle;
 }
-.fm-table tbody tr { cursor: pointer; transition: background 0.1s; }
-.fm-table tbody tr:hover { background: #1a1a3a; }
-.fm-row-selected { background: #1e1e4a !important; }
+.fm-table tbody tr {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.fm-table tbody tr:nth-child(odd)  { background: #101026; }
+.fm-table tbody tr:nth-child(even) { background: #181835; }
+.fm-table tbody tr:hover           { background: #1e1e44 !important; }
+.fm-row-selected                    { background: #252550 !important; }
 .fm-row-up { color: #aaa; cursor: pointer; }
-.fm-row-up:hover { background: #1a1a3a; }
+.fm-row-up:hover { background: #1e1e44 !important; }
 .fm-col-name { width: auto; }
 /* size/modified/actions 列宽由 Vue 动态控制，以下为默认值 */
 .fm-col-size { width: 90px; }
