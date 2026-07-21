@@ -1,16 +1,16 @@
-/* YPanel 全局样式 — 文件管理器 */
+/* YPanel 全局样式 — 文件管理器（Element Plus 亮/暗主题适配） */
 
 .fm-container {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #12122a;
+  background: var(--el-bg-color-page);
 }
 .fm-toolbar {
   height: 38px;
   flex-shrink: 0;
-  background: #16162e;
+  background: var(--el-bg-color);
   display: flex;
   align-items: center;
   padding: 0 10px;
@@ -41,22 +41,22 @@
 .fm-btn-sm {
   height: 28px;
   padding: 0 10px;
-  background: #22224a;
+  background: var(--el-fill-color);
   border: none;
   border-radius: 5px;
-  color: #ccc;
+  color: var(--el-text-color-regular);
   font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
 }
-.fm-btn-sm:hover { background: #2e2e5a; color: #fff; }
+.fm-btn-sm:hover { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
 .fm-btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
 .fm-mkdir-row {
   display: flex;
   gap: 6px;
   padding: 8px 10px;
-  background: #16162e;
+  background: var(--el-bg-color);
   align-items: center;
 }
 .fm-mkdir-input { flex: 1; max-width: 300px; height: 30px !important; font-size: 12px !important; }
@@ -66,22 +66,22 @@
 .fm-table th {
   position: relative;
   height: 28px;
-  background: #16162e;
-  color: #888;
+  background: var(--el-bg-color);
+  color: var(--el-text-color-secondary);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 0 10px;
   text-align: left;
-  border-bottom: 1px solid #2a2a4a;
+  border-bottom: 1px solid var(--el-border-color);
   vertical-align: middle;
 }
 .fm-table td {
   height: 28px;
   padding: 0 10px;
   font-size: 13px;
-  color: #ccc;
+  color: var(--el-text-color-regular);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -91,12 +91,12 @@
   cursor: pointer;
   transition: background 0.1s;
 }
-.fm-table tbody tr:nth-child(odd)  { background: #101026; }
-.fm-table tbody tr:nth-child(even) { background: #181835; }
-.fm-table tbody tr:hover           { background: #1e1e44 !important; }
-.fm-row-selected                    { background: #252550 !important; }
-.fm-row-up { color: #aaa; cursor: pointer; }
-.fm-row-up:hover { background: #1e1e44 !important; }
+.fm-table tbody tr:nth-child(odd)  { background: var(--el-fill-color-lighter); }
+.fm-table tbody tr:nth-child(even) { background: var(--el-fill-color); }
+.fm-table tbody tr:hover           { background: var(--el-fill-color-light) !important; }
+.fm-row-selected                    { background: var(--el-color-primary-light-9) !important; }
+.fm-row-up { color: var(--el-text-color-secondary); cursor: pointer; }
+.fm-row-up:hover { background: var(--el-fill-color-light) !important; }
 .fm-col-name { width: auto; }
 /* size/modified/actions 列宽由 Vue 动态控制，以下为默认值 */
 .fm-col-size { width: 90px; }
@@ -106,7 +106,7 @@
 .fm-cell-num {
   font-family: Menlo, Monaco, 'Courier New', monospace;
   font-size: 11px !important;
-  color: #888 !important;
+  color: var(--el-text-color-secondary) !important;
 }
 .fm-cell-act { text-align: left !important; white-space: nowrap; }
 .fm-cell-act .fm-act-btn + .fm-act-btn { margin-left: 2px; }
@@ -118,16 +118,16 @@
   border-radius: 4px;
   cursor: pointer;
   font-size: 11px;
-  color: #aaa;
+  color: var(--el-text-color-secondary);
   transition: background 0.15s, color 0.15s;
   vertical-align: middle;
 }
-.fm-act-btn:hover { background: #2a2a4a; color: #fff; }
-.fm-act-del:hover { background: rgba(255, 85, 85, 0.25); color: #ff5555; }
+.fm-act-btn:hover { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
+.fm-act-del:hover { background: rgba(255, 85, 85, 0.25); color: var(--el-color-danger); }
 .fm-empty, .fm-loading {
   padding: 40px;
   text-align: center;
-  color: #666;
+  color: var(--el-text-color-placeholder);
   font-size: 13px;
 }
 
@@ -141,9 +141,9 @@
   cursor: col-resize;
   user-select: none;
   z-index: 2;
-  border-left: 1px solid #444;
+  border-left: 1px solid var(--el-border-color-darker);
 }
 .fm-resize-handle:hover,
 .fm-resize-handle:active {
-  border-left-color: #6272a4;
+  border-left-color: var(--el-color-primary);
 }
