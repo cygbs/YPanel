@@ -6,7 +6,7 @@
   "homepage": "https://github.com/cygbs/YPanel",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cygbs/YPanel"
+    "url": "git+https://github.com/cygbs/YPanel.git"
   },
   "keywords": [
     "minecraft",
@@ -16,7 +16,7 @@
     "game-server"
   ],
   "bin": {
-    "ypanel": "./bin/ypanel.js"
+    "ypanel": "bin/ypanel.js"
   },
   "files": [
     "bin/",
