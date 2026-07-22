@@ -123,7 +123,7 @@ app.use(express.static(PUBLIC_DIR));
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const NODES_FILE = path.join(DATA_DIR, 'nodes.json');
 const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
-const HUB_SETTINGS_FILE = path.join(DATA_DIR, 'hub-settings.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 
 function ensureDataDir(): void {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -179,12 +179,16 @@ function writeAuth(data: AuthData): void {
 // ═══════════════════════════════════════════════════
 
 interface HubSettings {
+  host: string;
+  port: number;
   securityEntry: string;
   securityContent: string;
 }
 
 function defaultHubSettings(): HubSettings {
   return {
+    host: '0.0.0.0',
+    port: 6699,
     securityEntry: '',
     securityContent: '<!DOCTYPE html>\n<html lang="en">\n<head><title>404 Not Found</title></head>\n<body>\n<center><h1>404 Not Found</h1></center>\n<hr><center>nginx</center>\n</body>\n</html>',
   };
@@ -195,17 +199,17 @@ let hubSettingsCache: HubSettings;
 
 function loadHubSettings(): HubSettings {
   ensureDataDir();
-  if (!fs.existsSync(HUB_SETTINGS_FILE)) {
+  if (!fs.existsSync(SETTINGS_FILE)) {
     // 首次运行：写入默认设置
     const def = defaultHubSettings();
-    writeJSON(HUB_SETTINGS_FILE, def);
+    writeJSON(SETTINGS_FILE, def);
     return def;
   }
   try {
-    return JSON.parse(fs.readFileSync(HUB_SETTINGS_FILE, 'utf-8')) as HubSettings;
+    return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')) as HubSettings;
   } catch {
-    console.error('FATAL: Cannot parse data/hub-settings.json — file may be corrupted.');
-    console.error('  To reset, delete data/hub-settings.json and restart.');
+    console.error('FATAL: Cannot parse data/settings.json — file may be corrupted.');
+    console.error('  To reset, delete data/settings.json and restart.');
     process.exit(1);
   }
 }
@@ -219,7 +223,7 @@ function readHubSettings(): HubSettings {
 
 function writeHubSettings(data: HubSettings): void {
   ensureDataDir();
-  writeJSON(HUB_SETTINGS_FILE, data);
+  writeJSON(SETTINGS_FILE, data);
   hubSettingsCache = data;
 }
 
@@ -1210,10 +1214,12 @@ for (const node of startupNodes.nodes) {
 }
 writeNodes(startupNodes);
 
-const PORT = parseInt(process.env.PORT || '6699', 10);
-server.listen(PORT, () => {
-  console.log(`YPanel Hub running on http://localhost:${PORT}`);
-  console.log(`  Node link: ws://localhost:${PORT}/link/<token>`);
+const settings = readHubSettings();
+const PORT = settings.port;
+const HOST = settings.host || '0.0.0.0';
+server.listen(PORT, HOST, () => {
+  console.log(`YPanel Hub running on http://${HOST}:${PORT}`);
+  console.log(`  Node link: ws://${HOST}:${PORT}/link/<token>`);
   if (!firstRunCreds) {
     console.log('  Use existing credentials to login');
   }
