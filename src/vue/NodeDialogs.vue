@@ -22,7 +22,7 @@
     :close-on-click-modal="true">
     <div class="node-token-label" style="margin-bottom:8px">{{ $t('token_dialog.command_hint') }}</div>
     <div class="token-cmd-box">
-      <code class="token-cmd-text">node index.js -s {{ wsHost }} -t {{ generatedToken }}</code>
+      <code class="token-cmd-text">ypanel node -s {{ wsHost }} -t {{ generatedToken }}</code>
     </div>
     <div class="token-cmd-note">{{ $t('token_dialog.auto_close') }}</div>
     <template #footer>

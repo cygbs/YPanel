@@ -51,7 +51,7 @@ const TERM_ROWS = 24;
 const MAX_OUTPUT_BUFFER = 2000;
 
 if (!HUB_BASE_URL || !TOKEN) {
-  console.error('Usage: node index.js -s <hub-url> -t <token> [-k]');
+  console.error('Usage: ypanel node -s <hub-url> -t <token> [-k]');
   console.error('  -s  Hub base URL (e.g. ws://127.0.0.1:6699)');
   console.error('  -t  Node auth token');
   console.error('  -k  Allow self-signed certificates (reduces security)');

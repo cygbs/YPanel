@@ -39,29 +39,16 @@ This is a simple web panel suitable for Minecraft servers, or any other programs
 
 ## Running
 
-**One-click script:**
+You can now install YPanel via npm! This is probably something you've never seen with other panels. Simply run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cygbs/YPanel/refs/heads/main/scripts/install.sh | sudo bash
+npm i -g ypanel
+ypanel
 ```
 
-This script currently requires systemd functionality. If your system lacks it, please use the manual method below and write your own startup script. When using the one-click script, ensure your network connection is smooth.
+You need one Hub and at least one Node to use this panel. Install Node.js on each machine, then install the npm package. Use the `ypanel` command to start the Hub, add a node through the web panel, and you'll get the node startup command.
 
-**One-click uninstall:**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/cygbs/YPanel/refs/heads/main/scripts/uninstall.sh | sudo bash
-```
-
-The uninstall script can only remove YPanel installed via the installation script; other cases may not be handled.
-
-**Manual method:**
-
-First, ensure you have a Node.js environment. Please [install Node.js](https://nodejs.org/en/download). Download `YPanel.zip` from [Releases](https://github.com/cygbs/YPanel/releases), and after decompressing, `dist` is the Hub part, `dist-node` is the Node part. They need to be used together.
-
-The startup method is: first enter the `dist` directory and execute `node index.js` to start the Hub, then add and obtain the Node startup command within the Hub, and finally run the Node startup command in the `dist-node` folder. The node will connect shortly.
-
-You need one Hub and at least one Node to use this panel. **Never run the panel or instances using accounts like root, Administrator, or SYSTEM! This puts you at risk. If you installed via the one-click script, it creates and runs under a low-privilege user by default. Also, make sure to put the panel behind HTTPS (via nginx or similar HTTP server software). Even a self-signed certificate is much better than exposing plain HTTP to the public internet. Ideally, configure a certificate from Let's Encrypt (you can use an auto-renewal tool like acme.sh).**
+**Never run the panel or instances using accounts like root, Administrator, or SYSTEM! This puts you at risk. Also, make sure to put the panel behind HTTPS (via nginx or similar HTTP server software). Even a self-signed certificate is much better than exposing plain HTTP to the public internet. Ideally, configure a certificate from Let's Encrypt (you can use an auto-renewal tool like acme.sh).**
 
 ## Building
 
