@@ -746,7 +746,8 @@ function handleUploadCancel(msg: any): void {
   if (state) {
     try { state.stream.end(); } catch { /* ignore */ }
     uploadStates.delete(uploadSessionId);
-    console.log(`[upload] cancelled: ${state.filePath}`);
+    try { fs.unlinkSync(state.filePath); } catch { /* ignore */ }
+    console.log(`[upload] cancelled, deleted partial file: ${state.filePath}`);
   }
 }
 

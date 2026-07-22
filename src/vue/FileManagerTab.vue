@@ -32,6 +32,15 @@
       <button class="btn btn-secondary btn-sm" @click="renameTarget = null">{{ $t('cancel') }}</button>
     </div>
 
+    <!-- 上传进度 -->
+    <div v-if="uploading" class="fm-upload-row">
+      <div class="fm-upload-bar-wrap">
+        <el-progress :percentage="uploadProgress" :stroke-width="8" :show-text="false" />
+      </div>
+      <span class="fm-upload-info">{{ uploadProgress }}% · {{ formatSize(uploadedBytes) }} / {{ formatSize(uploadTotalBytes) }}</span>
+      <el-button size="small" type="danger" plain @click="cancelUpload">{{ $t('fm.upload_cancel') }}</el-button>
+    </div>
+
     <!-- 隐藏的 file input 用于上传 -->
     <input ref="fileInput" type="file" class="upload-input-hidden" @change="onFilePicked" />
 
@@ -134,6 +143,12 @@ export default defineComponent({
 
     // 上传
     const fileInput = ref<HTMLInputElement | null>(null);
+    const uploading = ref(false);
+    const uploadProgress = ref(0);
+    const uploadedBytes = ref(0);
+    const uploadTotalBytes = ref(0);
+    const uploadFileName = ref('');
+    let uploadWs: WebSocket | null = null;
 
     const initialLoad = ref(false);
     const nodeIdStr = ref('');
@@ -385,42 +400,72 @@ export default defineComponent({
       if (!file) return;
       input.value = '';
 
-      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${protocol}//${location.host}/upload?nodeId=${props.nodeId}`);
+      uploading.value = true;
+      uploadFileName.value = file.name;
+      uploadTotalBytes.value = file.size;
+      uploadedBytes.value = 0;
+      uploadProgress.value = 0;
 
-      ws.onopen = () => {
-        ws.send(JSON.stringify({
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      uploadWs = new WebSocket(`${protocol}//${location.host}/upload?nodeId=${props.nodeId}`);
+
+      uploadWs.onopen = () => {
+        uploadWs!.send(JSON.stringify({
           type: 'upload_start', fileName: file.name,
           uploadPath: currentPath.value, fileSize: file.size,
         }));
       };
 
       const CHUNK_SIZE = 64 * 1024;
-      ws.onmessage = async (event) => {
+      let bytesSent = 0;
+      uploadWs.onmessage = async (event) => {
         let msg: any;
         try { msg = JSON.parse(event.data); } catch { return; }
         if (msg.type === 'upload_ack' && msg.status === 'ready') {
           const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
           for (let i = 0; i < totalChunks; i++) {
-            if (ws.readyState !== WebSocket.OPEN) break;
+            if (!uploadWs || uploadWs.readyState !== WebSocket.OPEN) break;
             const start = i * CHUNK_SIZE, end = Math.min(start + CHUNK_SIZE, file.size);
             const chunk = file.slice(start, end);
             const buffer = await chunk.arrayBuffer();
             const bytes = new Uint8Array(buffer);
             let binary = '';
             for (let j = 0; j < bytes.length; j++) binary += String.fromCharCode(bytes[j]);
-            ws.send(JSON.stringify({ type: 'upload_chunk', data: btoa(binary), index: i, total: totalChunks, final: i === totalChunks - 1 }));
+            uploadWs?.send(JSON.stringify({ type: 'upload_chunk', data: btoa(binary), index: i, total: totalChunks, final: i === totalChunks - 1 }));
+            bytesSent += (end - start);
+            uploadedBytes.value = bytesSent;
+            uploadProgress.value = Math.round((bytesSent / file.size) * 100);
           }
         } else if (msg.type === 'upload_complete') {
           showNotification(t('fm.upload_complete'), 'success');
-          ws.close();
+          uploadWs!.close();
+          uploading.value = false;
+          uploadWs = null;
           refresh();
         } else if (msg.type === 'upload_error') {
           showNotification(msg.message || t('fm.upload_failed'), 'error');
-          ws.close();
+          uploadWs!.close();
+          uploading.value = false;
+          uploadWs = null;
         }
       };
-      ws.onerror = () => { showNotification(t('fm.upload_failed'), 'error'); };
+      uploadWs.onerror = () => { showNotification(t('fm.upload_failed'), 'error'); uploading.value = false; uploadWs = null; };
+    }
+
+    // ── 取消上传 ──
+    async function cancelUpload(): Promise<void> {
+      try {
+        await ElMessageBox.confirm(
+          t('fm.upload_cancel_confirm'),
+          t('fm.upload_cancel_title'),
+          { confirmButtonText: t('fm.upload_cancel_btn'), cancelButtonText: t('cancel'), type: 'warning' }
+        );
+      } catch { return; /* cancelled */ }
+      if (uploadWs) {
+        uploadWs.close();
+        uploadWs = null;
+      }
+      uploading.value = false;
     }
 
     function formatSize(bytes: number): string {
@@ -442,7 +487,8 @@ export default defineComponent({
       colWidths, startResize,
       mkdirVisible, mkdirName, mkdirInput, doMkdir, showMkdir,
       renameTarget, renameName, renameInput, startRename, doRename,
-      fileInput, triggerUpload, onFilePicked,
+      fileInput, triggerUpload, onFilePicked, cancelUpload,
+      uploading, uploadProgress, uploadedBytes, uploadTotalBytes, uploadFileName,
       enterItem, goUp, navigateTo, onAddrFocus, refresh,
       confirmDelete, downloadFile, startEdit, formatSize, formatDate,
     };

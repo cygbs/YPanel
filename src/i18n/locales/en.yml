@@ -193,6 +193,10 @@ fm:
   upload: Upload File
   upload_complete: Upload complete
   upload_failed: Upload failed
+  upload_cancel: Cancel upload
+  upload_cancel_title: Cancel Upload
+  upload_cancel_confirm: Are you sure you want to cancel? Uploaded data will be deleted.
+  upload_cancel_btn: Cancel Upload
   refresh: Refresh
   rename: Rename
   rename_placeholder: New name

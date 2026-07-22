@@ -193,6 +193,10 @@ fm:
   upload: 上傳檔案
   upload_complete: 上傳完成
   upload_failed: 上傳失敗
+  upload_cancel: 取消上傳
+  upload_cancel_title: 取消上傳
+  upload_cancel_confirm: 確定要取消上傳嗎？已傳輸的資料將被刪除。
+  upload_cancel_btn: 取消上傳
   refresh: 重新整理
   rename: 重新命名
   rename_placeholder: 新名稱
