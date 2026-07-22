@@ -3,7 +3,7 @@ A web panel for Minecraft server.
 
 ![YPanel Logo](public/favicon.webp)
 
-[中文 README](https://github.com/cygbs/YPanel)
+[中文 README](https://github.com/cygbs/YPanel) | [npm package](https://www.npmjs.com/package/ypanel)
 
 This is a simple web panel suitable for Minecraft servers, or any other programs. It is built with TypeScript, Vue.js, and more. The instance icon comes from [Prism Launcher](https://prismlauncher.org), and the overall design is also inspired by it. This project uses the `deepseek-v4-flash` & `deepseek-v4-pro` model to assist with content creation.
 

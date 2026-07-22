@@ -24,6 +24,7 @@
     "dist-node/",
     "README.md",
     "README_EN.md",
+    "SOURCE",
     "LICENSE"
   ],
   "engines": {

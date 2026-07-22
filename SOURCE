@@ -1,0 +1,18 @@
+YPanel Source Code Availability (AGPLv3 Section 6)
+
+This npm package contains compiled/minified code (non-source form).
+
+The Corresponding Source code (TypeScript, Vue, and CSS source files) is freely
+available under AGPL-3.0-or-later at:
+
+    https://github.com/cygbs/YPanel
+
+To build from source:
+
+    git clone https://github.com/cygbs/YPanel.git
+    cd YPanel
+    npm install
+    npm run build
+
+The source code will remain available at the above URL for at least three years
+after the last distribution of this package.

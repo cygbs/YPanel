@@ -3,7 +3,7 @@ A web panel for Minecraft server.
 
 ![YPanel Logo](public/favicon.webp)
 
-[English README](https://github.com/cygbs/YPanel/blob/main/README_EN.md)
+[English README](https://github.com/cygbs/YPanel/blob/main/README_EN.md) | [npm包](https://www.npmjs.com/package/ypanel)
 
 这是一个简单的网页面板，适用于Minecraft服务器，或者是别的什么程序。它使用TypeScript、Vue.js等编写。实例图标来自[Prism Launcher](https://prismlauncher.org)，整体上也参考了它的设计。项目使用`deepseek-v4-flash`和`deepseek-v4-pro`模型辅助创作。
 
