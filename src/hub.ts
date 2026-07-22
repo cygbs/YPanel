@@ -662,54 +662,60 @@ app.put('/api/nodes/:id', mutationLimiter, (req, res) => {
 // API（隧道转发）
 // ═══════════════════════════════════════════════════
 
+/** Node API 错误 → 透传真实状态码；连接/超时 → 502 */
+function relayNodeError(e: unknown, res: express.Response): void {
+  if (e instanceof NodeApiError) { res.status(e.status).json({ error: e.message }); }
+  else { res.status(502).json({ error: '节点未连接或请求超时' }); }
+}
+
 app.get('/api/node/:nodeId/instances', async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', '/api/instances')); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e) { relayNodeError(e, res); }
 });
 
 app.post('/api/node/:nodeId/instances', mutationLimiter, async (req, res) => {
   try { res.status(201).json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', '/api/instances', req.body)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e) { relayNodeError(e, res); }
 });
 
 app.put('/api/node/:nodeId/instances/:instanceId', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'PUT', `/api/instances/${req.params.instanceId}`, req.body)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e) { relayNodeError(e, res); }
 });
 
 app.delete('/api/node/:nodeId/instances/:instanceId', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'DELETE', `/api/instances/${req.params.instanceId}`)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e) { relayNodeError(e, res); }
 });
 
 app.post('/api/node/:nodeId/instances/:instanceId/start', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', `/api/instances/${req.params.instanceId}/start`, req.body)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e) { relayNodeError(e, res); }
 });
 
 app.post('/api/node/:nodeId/instances/:instanceId/stop', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', `/api/instances/${req.params.instanceId}/stop`, req.body)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e) { relayNodeError(e, res); }
 });
 
 app.post('/api/node/:nodeId/instances/:instanceId/force-stop', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'POST', `/api/instances/${req.params.instanceId}/force-stop`, req.body)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e) { relayNodeError(e, res); }
 });
 
 app.get('/api/node/:nodeId/instances/:instanceId/status', async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', `/api/instances/${req.params.instanceId}/status`)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e) { relayNodeError(e, res); }
 });
 
 app.get('/api/node/:nodeId/settings', async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'GET', '/api/settings')); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e) { relayNodeError(e, res); }
 });
 
 app.put('/api/node/:nodeId/settings', mutationLimiter, async (req, res) => {
   try { res.json(await sendApiRequest(parseInt(req.params.nodeId), 'PUT', '/api/settings', req.body)); }
-  catch { res.status(502).json({ error: '节点未连接或请求超时' }); }
+  catch (e) { relayNodeError(e, res); }
 });
 
 // ── 文件管理隧道 ──
@@ -1013,10 +1019,8 @@ function extractWsToken(req: http.IncomingMessage): string | null {
   return getSessionCookie(req);
 }
 
-/** 从请求中提取客户端 IP（支持反向代理） */
+/** 从请求中提取客户端 IP（仅使用直连 IP，不信任 X-Forwarded-For 头） */
 function getClientIp(req: http.IncomingMessage): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
   return req.socket.remoteAddress || 'unknown';
 }
 

@@ -70,6 +70,9 @@ instances:
   open_terminal: 啟終端
   open_folder: 啟目錄
   start_first: 請先啟實例。
+  start_failed: 啟敗
+  save_failed: 存敗
+  delete_failed: 刪敗
   edit: 編
   delete: 刪實例
 
@@ -139,6 +142,7 @@ hub_settings:
   entry_hint: 設後唯訪 /{entry} 方得入面板，其餘路徑返 404
   entry_placeholder: 留空則無密徑
   security_content: 返文
+  save_failed: 存敗
 
 # ── 上傳文檔 ──
 upload:

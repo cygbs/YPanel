@@ -437,7 +437,7 @@ export default defineComponent({
           });
           if (res.ok) { const created = await res.json(); instances.value.push(created); closeNewDialog(); }
         }
-      } catch (e) { console.error('Failed to save instance', e); }
+      } catch (e) { showNotification(t('instances.save_failed'), 'error'); console.error('Failed to save instance', e); }
       finally { saving.value = false; }
     }
 
@@ -445,10 +445,10 @@ export default defineComponent({
       const inst = selectedInstance.value; if (!inst || activeNodeId.value === null) return;
       try {
         const res = await apiFetch(apiPrefix() + '/instances/' + inst.id + '/start', { method: 'POST' });
-        if (!res.ok) { console.error('start failed:', res.status, await res.text()); return; }
+        if (!res.ok) { showNotification(t('instances.start_failed'), 'error'); console.error('start failed:', res.status, await res.text()); return; }
         const data = await res.json();
         if (data.status === 'started' || data.status === 'already_running') runningStates[inst.id] = 'running';
-      } catch (e) { console.error('start error:', e); }
+      } catch (e) { showNotification(t('instances.start_failed'), 'error'); console.error('start error:', e); }
     }
 
     function openTerminalForInstance(inst: any): void {
@@ -496,7 +496,7 @@ export default defineComponent({
       try {
         const res = await apiFetch(apiPrefix() + '/instances/' + id, { method: 'DELETE' });
         if (res.ok) { instances.value = instances.value.filter(i => i.id !== id); delete runningStates[id]; selectedId.value = null; showDeleteConfirm.value = false; }
-      } catch (e) { console.error('Failed to delete instance', e); }
+      } catch (e) { showNotification(t('instances.delete_failed'), 'error'); console.error('Failed to delete instance', e); }
     }
 
     // ── Hub 设置 ──
@@ -518,7 +518,7 @@ export default defineComponent({
       try {
         await apiFetch('/api/hub-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ securityEntry: '/' + hubSecurityEntry.value, securityContent: hubSecurityContent.value }) });
         showHubSettings.value = false;
-      } catch (e) { console.error('Failed to save hub settings', e); }
+      } catch (e) { showNotification(t('hub_settings.save_failed'), 'error'); console.error('Failed to save hub settings', e); }
       finally { savingHubSettings.value = false; }
     }
 

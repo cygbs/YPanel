@@ -70,6 +70,9 @@ instances:
   open_terminal: 打开终端
   open_folder: 打开文件夹
   start_first: 请先启动实例。
+  start_failed: 启动失败
+  save_failed: 保存失败
+  delete_failed: 删除失败
   edit: 编辑
   delete: 删除实例
 
@@ -139,6 +142,7 @@ hub_settings:
   entry_hint: 设置后访问 /{entry} 才可进入面板，其余路径返回 404
   entry_placeholder: 留空则无安全入口
   security_content: 返回内容
+  save_failed: 保存失败
 
 # ── 文件上传 ──
 upload:

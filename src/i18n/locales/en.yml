@@ -70,6 +70,9 @@ instances:
   open_terminal: Open Terminal
   open_folder: Open Folder
   start_first: Please start the instance first.
+  start_failed: Start failed
+  save_failed: Save failed
+  delete_failed: Delete failed
   edit: Edit
   delete: Delete Instance
 
@@ -139,6 +142,7 @@ hub_settings:
   entry_hint: After setting, access /{entry} to enter the panel. Other paths return 404.
   entry_placeholder: Leave empty for no security entry
   security_content: Response Content
+  save_failed: Save failed
 
 # ── File Upload ──
 upload:
