@@ -250,6 +250,9 @@ function cleanExpiredSessions(): void {
       securityBypassTokens.delete(token);
     }
   }
+  for (const [ip, entry] of linkRateLimitMap) {
+    if (now > entry.resetAt) linkRateLimitMap.delete(ip);
+  }
 }
 // 每分钟清理一次
 setInterval(cleanExpiredSessions, 60_000);
@@ -1010,8 +1013,37 @@ function extractWsToken(req: http.IncomingMessage): string | null {
   return getSessionCookie(req);
 }
 
+/** 从请求中提取客户端 IP（支持反向代理） */
+function getClientIp(req: http.IncomingMessage): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
+  return req.socket.remoteAddress || 'unknown';
+}
+
+// ── /link WebSocket 频率限制 ──
+const linkRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const LINK_RATE_WINDOW = 15 * 60 * 1000; // 15 分钟
+const LINK_RATE_MAX = 200;               // 窗口内最多 200 次连接
+
+function checkLinkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = linkRateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    linkRateLimitMap.set(ip, { count: 1, resetAt: now + LINK_RATE_WINDOW });
+    return true;
+  }
+  if (entry.count >= LINK_RATE_MAX) return false;
+  entry.count++;
+  return true;
+}
+
 wss.on('connection', (ws: WebSocket, req) => {
   const parsed = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
+
+  // /link → 频率限制（新旧路径均适用）
+  if (parsed.pathname.startsWith('/link/') || parsed.pathname === '/link') {
+    if (!checkLinkRateLimit(getClientIp(req))) { ws.close(); return; }
+  }
 
   // /link/<token> → 节点接入（token 在 URL 路径中认证）
   if (parsed.pathname.startsWith('/link/')) {
