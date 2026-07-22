@@ -9,7 +9,7 @@
  * - Node 不暴露 HTTP 端口，所有通信通过一条 WebSocket 连接进行
  *
  * 用法：
- *   tsx src/node.ts -s ws://hub:6699/link -t <token>
+ *   tsx src/node.ts -s ws://127.0.0.1:6699 -t <token>
  */
 
 import { WebSocket } from 'ws';
@@ -39,7 +39,7 @@ for (let i = 2; i < process.argv.length; i++) {
     }
   }
 }
-const HUB_URL = args.s || '';
+const HUB_BASE_URL = args.s || '';
 const TOKEN = args.t || '';
 const INSECURE = !!args.k;
 
@@ -48,13 +48,36 @@ const TERM_COLS = 80;
 const TERM_ROWS = 24;
 const MAX_OUTPUT_BUFFER = 2000;
 
-if (!HUB_URL || !TOKEN) {
-  console.error('Usage: node index.js -s <hub-ws-url> -t <token> [-k]');
-  console.error('  -s  Hub WebSocket URL (e.g. wss://1.2.3.4:7000/link)');
+if (!HUB_BASE_URL || !TOKEN) {
+  console.error('Usage: node index.js -s <hub-url> -t <token> [-k]');
+  console.error('  -s  Hub base URL (e.g. ws://127.0.0.1:6699)');
   console.error('  -t  Node auth token');
   console.error('  -k  Allow self-signed certificates (reduces security)');
   process.exit(1);
 }
+
+// ── 校验 UUID 格式 ──
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+if (!UUID_RE.test(TOKEN)) {
+  console.error('Error: -t must be a valid UUID v4 token');
+  process.exit(1);
+}
+
+// ── 校验 URL：-s 必须不包含路径，不要末尾 / ──
+{
+  try { new URL(HUB_BASE_URL); } catch {
+    console.error('Error: -s must be a valid URL (e.g. ws://localhost:6699)');
+    process.exit(1);
+  }
+  // URL 对象总会标准化出 /，所以用原始字符串检查
+  const raw = HUB_BASE_URL;
+  const afterHost = raw.replace(/^wss?:\/\/[^/]+/, '');
+  if (afterHost !== '') {
+    console.error('Error: -s URL must not contain a path (just ws://host:port without trailing /)');
+    process.exit(1);
+  }
+}
+const HUB_URL = HUB_BASE_URL.replace(/\/$/, '') + '/link/' + TOKEN;
 
 // ── 路径解析 ──
 const ROOT_DIR = process.argv[1]?.endsWith('.ts')
@@ -776,7 +799,6 @@ function connectToHub(): void {
     const nd = readNodeData();
     ws.send(JSON.stringify({
       type: 'register',
-      token: TOKEN,
       totalRuntime: nd.totalRuntime || 0,
       startTime: nd.startTime,
     }));

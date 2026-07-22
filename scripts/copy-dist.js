@@ -49,5 +49,5 @@ console.log('  zigpty: dist + prebuilds copied');
 
 console.log('Node dist ready: run node dist-node/index.js -s <hub-url> -t <token>');
 console.log('');
-console.log('Example: node dist-node/index.js -s ws://localhost:6699/link -t YOUR_TOKEN');
+console.log('Example: node dist-node/index.js -s ws://localhost:6699 -t YOUR_TOKEN');
 console.log('To start hub:  node dist/index.js');

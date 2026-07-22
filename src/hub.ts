@@ -761,37 +761,56 @@ function handleUploadMessage(msg: any): void {
   }
 }
 
-function handleLinkConnection(ws: WebSocket): void {
-  let heartbeat: ReturnType<typeof setInterval> | null = null;
+function handleLinkConnection(ws: WebSocket, token: string): void {
+  // ── 通过 URL 中的 token 立即认证 ──
+  const nodeData = readNodes();
+  const existing = nodeData.nodes.find(n => n.token === token);
+  if (!existing) {
+    ws.send(JSON.stringify({ type: 'error', message: 'invalid token' }));
+    setTimeout(() => ws.close(), 1000);
+    return;
+  }
 
+  const nodeId = existing.id;
+  const now = new Date().toISOString();
+  existing.connected = true;
+  existing.lastSeen = now;
+
+  const oldWs = nodeConnections.get(nodeId);
+  if (oldWs && oldWs !== ws) { try { oldWs.close(); } catch { /* ignore */ } }
+  writeNodes(nodeData);
+  nodeConnections.set(nodeId, ws);
+  wsToNodeId.set(ws, nodeId);
+
+  ws.send(JSON.stringify({ type: 'registered', nodeId }));
+
+  let heartbeat: ReturnType<typeof setInterval> | null =
+    setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
+
+  broadcastEvent({ type: 'nodes', nodes: readNodes() });
+
+  console.log(`Node #${nodeId} (${existing.name}) connected via /link/<token>`);
+
+  // ── 消息处理 ──
   ws.on('message', (raw) => {
     let msg: any;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
 
     switch (msg.type) {
       case 'register': {
-        const data = readNodes();
-        const existing = data.nodes.find(n => n.token === msg.token);
-        if (existing) {
-          const nodeName = existing.name;
-          const now = new Date().toISOString();
-          const nodeId = existing.id;
-          existing.connected = true;
-          existing.lastSeen = now;
-          // 记录节点上报的运行时数据
-          if (typeof msg.totalRuntime === 'number') existing.totalRuntime = msg.totalRuntime;
-          if (msg.startTime !== undefined) existing.startTime = msg.startTime;
-          const oldWs = nodeConnections.get(nodeId);
-          if (oldWs && oldWs !== ws) { try { oldWs.close(); } catch { /* ignore */ } }
-          writeNodes(data);
-          nodeConnections.set(nodeId, ws);
-          wsToNodeId.set(ws, nodeId);
-          ws.send(JSON.stringify({ type: 'registered', nodeId }));
-          heartbeat = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.ping(); }, 30000);
-          broadcastEvent({ type: 'nodes', nodes: readNodes() });
-        } else {
-          ws.send(JSON.stringify({ type: 'error', message: 'invalid token' }));
-          setTimeout(() => ws.close(), 1000);
+        // 节点已在连接时认证，此处仅更新运行时数据
+        const nd = readNodes();
+        const node = nd.nodes.find(n => n.id === nodeId);
+        if (node) {
+          if (typeof msg.totalRuntime === 'number') node.totalRuntime = msg.totalRuntime;
+          if (msg.startTime !== undefined) node.startTime = msg.startTime;
+          writeNodes(nd);
+        }
+        // 上报正在运行的实例
+        if (Array.isArray(msg.instances)) {
+          for (const st of msg.instances) {
+            broadcastEvent({ type: 'instance_status', nodeId, instanceId: st.instanceId, running: true });
+          }
         }
         break;
       }
@@ -827,26 +846,22 @@ function handleLinkConnection(ws: WebSocket): void {
         break;
       }
       case 'node_status': {
-        const nid = wsToNodeId.get(ws);
-        if (nid !== undefined && Array.isArray(msg.instances)) {
+        if (Array.isArray(msg.instances)) {
           for (const st of msg.instances) {
-            broadcastEvent({ type: 'instance_status', nodeId: nid, instanceId: st.instanceId, running: true });
+            broadcastEvent({ type: 'instance_status', nodeId, instanceId: st.instanceId, running: true });
           }
         }
         break;
       }
       case 'process_exited': {
-        const nid = wsToNodeId.get(ws);
-        if (nid !== undefined) {
-          broadcastEvent({ type: 'instance_status', nodeId: nid, instanceId: msg.instanceId, running: false });
-          // 通知所有连接到该实例的终端会话
-          for (const [termId, entry] of terminalSessions) {
-            if (entry.nodeId === nid && entry.instanceId === msg.instanceId) {
-              if (entry.ws.readyState === WebSocket.OPEN) {
-                entry.ws.send(JSON.stringify({ type: 'instance_stopped' }));
-              }
-              terminalSessions.delete(termId);
+        broadcastEvent({ type: 'instance_status', nodeId, instanceId: msg.instanceId, running: false });
+        // 通知所有连接到该实例的终端会话
+        for (const [termId, entry] of terminalSessions) {
+          if (entry.nodeId === nodeId && entry.instanceId === msg.instanceId) {
+            if (entry.ws.readyState === WebSocket.OPEN) {
+              entry.ws.send(JSON.stringify({ type: 'instance_stopped' }));
             }
+            terminalSessions.delete(termId);
           }
         }
         break;
@@ -865,12 +880,12 @@ function handleLinkConnection(ws: WebSocket): void {
     if (heartbeat) clearInterval(heartbeat);
     const data = readNodes();
     let changed = false;
-    for (const [nodeId, conn] of nodeConnections) {
+    for (const [nid, conn] of nodeConnections) {
       if (conn === ws) {
-        const node = data.nodes.find(n => n.id === nodeId);
+        const node = data.nodes.find(n => n.id === nid);
         if (node) { node.connected = false; changed = true; }
-        nodeConnections.delete(nodeId);
-        cleanupNodeState(nodeId);
+        nodeConnections.delete(nid);
+        cleanupNodeState(nid);
         break;
       }
     }
@@ -952,9 +967,17 @@ function extractWsToken(req: http.IncomingMessage): string | null {
 wss.on('connection', (ws: WebSocket, req) => {
   const parsed = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
 
-  // /link → 节点接入（无需 token）
+  // /link/<token> → 节点接入（token 在 URL 路径中认证）
+  if (parsed.pathname.startsWith('/link/')) {
+    const nodeToken = parsed.pathname.slice('/link/'.length);
+    handleLinkConnection(ws, nodeToken);
+    return;
+  }
+
+  // /link（无 token）→ 拒绝旧连接方式
   if (parsed.pathname === '/link') {
-    handleLinkConnection(ws);
+    ws.send(JSON.stringify({ type: 'error', message: 'Missing node token. Use /link/<token>' }));
+    ws.close();
     return;
   }
 
@@ -1073,8 +1096,8 @@ wss.on('connection', (ws: WebSocket, req) => {
   });
 });
 
-app.get('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only' }));
-app.post('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only' }));
+app.get('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only. Use /link/<token>' }));
+app.post('/link', (_req, res) => res.status(400).json({ error: 'WebSocket only. Use /link/<token>' }));
 
 // ═══════════════════════════════════════════════════
 // 全局错误处理（阻止 body parser 堆栈泄漏）
@@ -1108,7 +1131,7 @@ writeNodes(startupNodes);
 const PORT = parseInt(process.env.PORT || '6699', 10);
 server.listen(PORT, () => {
   console.log(`YPanel Hub running on http://localhost:${PORT}`);
-  console.log(`  Node link: ws://localhost:${PORT}/link`);
+  console.log(`  Node link: ws://localhost:${PORT}/link/<token>`);
   if (!firstRunCreds) {
     console.log('  Use existing credentials to login');
   }

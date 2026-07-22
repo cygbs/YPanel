@@ -273,7 +273,7 @@ export default defineComponent({
 
     function copyToken(): void {
       const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const cmd = `node index.js -s ${wsProto}//${window.location.host}/link -t ${generatedToken.value}`;
+      const cmd = `node index.js -s ${wsProto}//${window.location.host} -t ${generatedToken.value}`;
       function fallbackCopy(text: string): void {
         const ta = document.createElement('textarea'); ta.value = text;
         ta.style.position = 'fixed'; ta.style.opacity = '0';
