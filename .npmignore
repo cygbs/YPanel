@@ -42,7 +42,6 @@ Thumbs.db
 .prettierrc*
 .prettierignore
 
-# 环境变量
-.env
-.env.*
-!.env.example
+# 运行时数据（由 Hub 自动生成，不应发布）
+dist/data/
+dist-node/data/
