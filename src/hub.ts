@@ -47,6 +47,29 @@ const ROOT_DIR = process.argv[1]?.endsWith('.ts')
 const PUBLIC_DIR = process.argv[1]?.endsWith('.ts')
   ? path.resolve(ROOT_DIR, 'dist', 'public')
   : path.join(ROOT_DIR, 'public');
+// ── 安全入口暴力破解防护 ──
+// 当安全入口处于活动状态时，限制未认证请求的频率
+const securityEntryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,  // 15 分钟内最多 60 次未认证请求
+  skip: (req) => {
+    const settings = readHubSettings();
+    const entry = settings.securityEntry?.trim();
+    // 安全入口未启用，不限制
+    if (!entry || entry === '/') return true;
+    // 已通过安全入口绕过的请求，不计数
+    return isSecurityEntryBypassed(req);
+  },
+  handler: (_req, res) => {
+    res.status(429).type('html').send(
+      '<!DOCTYPE html>\n<html lang="en">\n<head><title>429 Too Many Requests</title></head>\n<body>\n<center><h1>429 Too Many Requests</h1></center>\n<hr><center>nginx</center>\n</body>\n</html>');
+  },
+  standardHeaders: false,
+  legacyHeaders: false,
+});
+
+app.use(securityEntryLimiter);
+
 // ── 安全入口中间件 ──
 // 若设置了安全入口（非空且非 /），用户必须先访问该入口路径才能使用面板
 // 访问入口路径后会设置 bypass cookie 并重定向到 /
@@ -167,14 +190,37 @@ function defaultHubSettings(): HubSettings {
   };
 }
 
-function readHubSettings(): HubSettings {
+// ── 缓存 hub 设置，避免每次请求读磁盘，且损坏时 fail-closed ──
+let hubSettingsCache: HubSettings;
+
+function loadHubSettings(): HubSettings {
   ensureDataDir();
-  return readJSON(HUB_SETTINGS_FILE, defaultHubSettings());
+  if (!fs.existsSync(HUB_SETTINGS_FILE)) {
+    // 首次运行：写入默认设置
+    const def = defaultHubSettings();
+    writeJSON(HUB_SETTINGS_FILE, def);
+    return def;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(HUB_SETTINGS_FILE, 'utf-8')) as HubSettings;
+  } catch {
+    console.error('FATAL: Cannot parse data/hub-settings.json — file may be corrupted.');
+    console.error('  To reset, delete data/hub-settings.json and restart.');
+    process.exit(1);
+  }
+}
+
+// 在模块加载时初始化缓存（任何路由之前）
+hubSettingsCache = loadHubSettings();
+
+function readHubSettings(): HubSettings {
+  return hubSettingsCache;
 }
 
 function writeHubSettings(data: HubSettings): void {
   ensureDataDir();
   writeJSON(HUB_SETTINGS_FILE, data);
+  hubSettingsCache = data;
 }
 
 /** 首次运行：生成随机密码 */
