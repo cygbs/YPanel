@@ -5,3 +5,6 @@ data/
 public/client.js
 public/client.css
 
+# npm pack artifacts
+*.tgz
+

@@ -1,0 +1,48 @@
+# YPanel npm publish — .npmignore
+# "files" 字段已白名单控制，此文件双重保险排除漏网之鱼
+
+# 源代码（不发布）
+src/
+
+# 开发依赖
+node_modules/
+
+# 构建脚本
+scripts/
+
+# TypeScript 配置
+tsconfig.json
+tsconfig.node.json
+
+# Vite 配置
+vite.config.ts
+vite.config.js
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Hermes
+.hermes/
+
+# ESLint / Prettier
+.eslintrc*
+.prettierrc*
+.prettierignore
+
+# 环境变量
+.env
+.env.*
+!.env.example
