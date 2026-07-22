@@ -81,12 +81,8 @@ if (!UUID_RE.test(TOKEN)) {
 }
 const HUB_URL = HUB_BASE_URL.replace(/\/$/, '') + '/link/' + TOKEN;
 
-// ── 路径解析 ──
-const ROOT_DIR = process.argv[1]?.endsWith('.ts')
-  ? path.resolve(__dirname, '..')
-  : __dirname;
-
-const DATA_DIR = path.join(ROOT_DIR, 'data');
+// ── 数据存储（持久化到 ~/.ypanel/node，更新 npm 包不会丢失） ──
+const DATA_DIR = path.join(os.homedir(), '.ypanel', 'node');
 const INSTANCES_FILE = path.join(DATA_DIR, 'instances.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const DATA_FILE = path.join(DATA_DIR, 'data.json');

@@ -20,6 +20,7 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
@@ -121,8 +122,8 @@ app.use(express.json({ limit: '1mb' }));
 
 app.use(express.static(PUBLIC_DIR));
 
-// ── 数据存储 ──
-const DATA_DIR = path.join(ROOT_DIR, 'data');
+// ── 数据存储（持久化到 ~/.ypanel/hub，更新 npm 包不会丢失） ──
+const DATA_DIR = path.join(os.homedir(), '.ypanel', 'hub');
 const NODES_FILE = path.join(DATA_DIR, 'nodes.json');
 const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
