@@ -12,6 +12,8 @@
  *   tsx src/node.ts -s ws://127.0.0.1:6699 -t <token>
  */
 
+process.title = 'YPanelNode';
+
 import { WebSocket } from 'ws';
 import { spawn, type IPty } from 'zigpty';
 import path from 'path';

@@ -13,6 +13,8 @@
  *       双向皆由 Hub 上的同一条 WebSocket 承载。Node 不暴露端口。
  */
 
+process.title = 'YPanelHub';
+
 import express from 'express';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';

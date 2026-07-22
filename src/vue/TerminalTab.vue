@@ -109,8 +109,8 @@ export default defineComponent({
           return;
         }
         if (reconnectAttempts < MAX_RECONNECT) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-          terminal?.write('\r\n\x1b[33mReconnecting in ' + Math.round(delay / 1000) + 's...\x1b[0m\r\n');
+          // 前 3 次 1s 间隔快速重连，之后 2s 固定间隔
+          const delay = reconnectAttempts < 3 ? 1000 : 2000;
           reconnectAttempts++;
           reconnectTimer = setTimeout(connectWs, delay);
         } else {
